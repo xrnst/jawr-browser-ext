@@ -3,7 +3,7 @@ import { defineConfig } from 'wxt';
 
 export default defineConfig({
   srcDir: 'src',
-  extensionApi: 'chrome',
+  extensionApi: 'browser',
   modules: ['@wxt-dev/module-react'],
   vite: () => ({
     plugins: [tailwindcss()],
