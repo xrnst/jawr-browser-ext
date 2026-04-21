@@ -9,8 +9,23 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   manifest: {
-    name: 'jawr radio',
-    description: 'JAWR radio player',
-    permissions: ['offscreen'],
+    name: 'jawr',
+    description: 'a web-based radio that helps you find a new track to love! - jawr.org',
+    version: '2026.1.0.0',
+    permissions: ['offscreen', 'notifications', 'storage'],
+    commands: {
+      'toggle-radio': {
+        description: 'Toggle Radio',
+      },
+      'display-now-playing': {
+        description: 'Display Now Playing',
+      },
+      'lower-volume': {
+        description: 'Lower Radio Volume',
+      },
+      'raise-volume': {
+        description: 'Raise Radio Volume',
+      },
+    },
   },
 });

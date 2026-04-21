@@ -21,15 +21,17 @@ export type ExtensionState = {
   volume: VolumeState;
 };
 
+export type MessageTarget = 'background' | 'popup' | 'offscreen';
+
 export type ExtensionMessage =
-  | { type: 'PLAY' }
-  | { type: 'PAUSE' }
-  | { type: 'TOGGLE_MUTE' }
-  | { type: 'SET_VOLUME'; payload: number }
-  | { type: 'GET_STATE' }
-  | { type: 'STATE_UPDATE'; payload: ExtensionState }
-  | { type: 'OFFSCREEN_PLAY'; payload: string }
-  | { type: 'OFFSCREEN_PAUSE' }
-  | { type: 'OFFSCREEN_SET_VOLUME'; payload: number }
-  | { type: 'OFFSCREEN_SET_MUTED'; payload: boolean }
-  | { type: 'OFFSCREEN_ERROR' };
+  | { target: 'background'; type: 'PLAY' }
+  | { target: 'background'; type: 'PAUSE' }
+  | { target: 'background'; type: 'TOGGLE_MUTE' }
+  | { target: 'background'; type: 'SET_VOLUME'; payload: number }
+  | { target: 'background'; type: 'GET_STATE' }
+  | { target: 'background'; type: 'OFFSCREEN_ERROR' }
+  | { target: 'popup'; type: 'STATE_UPDATE'; payload: ExtensionState }
+  | { target: 'offscreen'; type: 'OFFSCREEN_PLAY'; payload: string }
+  | { target: 'offscreen'; type: 'OFFSCREEN_PAUSE' }
+  | { target: 'offscreen'; type: 'OFFSCREEN_SET_VOLUME'; payload: number }
+  | { target: 'offscreen'; type: 'OFFSCREEN_SET_MUTED'; payload: boolean };

@@ -1,1 +1,86 @@
 @import "tailwindcss";
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  src: url('./fonts/IBMPlexMono-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 700;
+  src: url('./fonts/IBMPlexMono-Bold.woff2') format('woff2');
+}
+
+@variant dark (&:is(.dark *));
+
+@theme {
+  --font-mono: 'IBM Plex Mono', monospace;
+  --color-gray-50: #f1f1f1;
+  --color-gray-100: #d4d4d4;
+  --color-gray-200: #ababab;
+  --color-gray-300: #848484;
+  --color-gray-400: #5d5d5d;
+  --color-gray-500: #4e4e4e;
+  --color-gray-600: #3e3e3e;
+  --color-gray-700: #303030;
+  --color-gray-800: #222222;
+  --color-gray-900: #151515;
+  --color-gray-950: #0b0b0b;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes eq-a {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes eq-b {
+  0%, 100% { transform: scaleY(0.6); }
+  50% { transform: scaleY(0.3); }
+}
+
+@keyframes eq-c {
+  0%, 100% { transform: scaleY(0.8); }
+  50% { transform: scaleY(0.5); }
+}
+
+* {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #848484;
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #303030;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #151515;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3e3e3e;
+}

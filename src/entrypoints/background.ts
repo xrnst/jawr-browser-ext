@@ -1,6 +1,6 @@
 import type { ExtensionMessage, ExtensionState, VolumeState } from '../types';
 import { fetchNowPlaying } from '../utils/api';
-import { loadVolume, saveVolume } from '../utils/storage';
+import { loadNotifications, loadVolume, saveVolume } from '../utils/storage';
 import { createWebSocketManager } from '../utils/websocket';
 
 const STREAM_URL = `${import.meta.env.VITE_AZURACAST_URL}/listen/jawr/radio.mp3`;
@@ -13,13 +13,13 @@ let state: ExtensionState = {
   volume: loadVolume(),
 };
 
-function broadcast(msg: ExtensionMessage) {
+function broadcastToPopup(msg: ExtensionMessage) {
   browser.runtime.sendMessage(msg).catch(() => {});
 }
 
 function setState(partial: Partial<ExtensionState>) {
   state = { ...state, ...partial };
-  broadcast({ type: 'STATE_UPDATE', payload: state });
+  broadcastToPopup({ target: 'popup', type: 'STATE_UPDATE', payload: state });
 }
 
 // --- Firefox: direct audio ---
@@ -55,31 +55,45 @@ function firefoxApplyVolume(volume: VolumeState) {
 
 // --- Chrome: offscreen audio ---
 
+const OFFSCREEN_URL = 'offscreen.html';
+
+async function hasOffscreenDocument(): Promise<boolean> {
+  const url = chrome.runtime.getURL(OFFSCREEN_URL);
+  const contexts = await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT'],
+    documentUrls: [url],
+  });
+  return contexts.length > 0;
+}
+
 async function chromeEnsureOffscreen() {
-  const existing = await chrome.offscreen.hasDocument();
-  if (!existing) {
-    await chrome.offscreen.createDocument({
-      url: chrome.runtime.getURL('offscreen.html'),
-      reasons: [chrome.offscreen.Reason.AUDIO_PLAYBACK],
-      justification: 'Radio audio playback',
-    });
-  }
+  if (await hasOffscreenDocument()) return;
+  await chrome.offscreen.createDocument({
+    url: OFFSCREEN_URL,
+    reasons: [chrome.offscreen.Reason.AUDIO_PLAYBACK],
+    justification: 'Radio audio playback',
+  });
+}
+
+async function chromeSendToOffscreen(msg: ExtensionMessage) {
+  if (!(await hasOffscreenDocument())) return;
+  chrome.runtime.sendMessage(msg).catch(() => {});
 }
 
 async function chromePlay() {
   await chromeEnsureOffscreen();
-  chrome.runtime.sendMessage({ type: 'OFFSCREEN_PLAY', payload: STREAM_URL } satisfies ExtensionMessage);
+  await chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_PLAY', payload: STREAM_URL });
   setState({ playing: true });
 }
 
-function chromePause() {
-  chrome.runtime.sendMessage({ type: 'OFFSCREEN_PAUSE' } satisfies ExtensionMessage);
+async function chromePause() {
+  await chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_PAUSE' });
   setState({ playing: false });
 }
 
-function chromeSendVolume(volume: VolumeState) {
-  chrome.runtime.sendMessage({ type: 'OFFSCREEN_SET_VOLUME', payload: volume.value } satisfies ExtensionMessage);
-  chrome.runtime.sendMessage({ type: 'OFFSCREEN_SET_MUTED', payload: volume.isMuted } satisfies ExtensionMessage);
+async function chromeSendVolume(volume: VolumeState) {
+  await chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_SET_VOLUME', payload: volume.value });
+  await chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_SET_MUTED', payload: volume.isMuted });
 }
 
 // --- Unified API ---
@@ -102,7 +116,21 @@ function applyVolume(volume: VolumeState) {
 // --- WebSocket ---
 
 createWebSocketManager(WS_URL, ({ song, history }) => {
+  const prev = state.song;
+  const changed = song && (song.title !== prev?.title || song.artist !== prev?.artist);
   setState({ song, history });
+  if (changed && song && state.playing) {
+    loadNotifications().then((enabled) => {
+      if (!enabled) return;
+      const title = song.artist ? `${song.artist} - ${song.title}` : (song.title ?? '');
+      browser.notifications.create({
+        type: 'basic',
+        iconUrl: song.art ?? '',
+        title: 'jawr',
+        message: title,
+      });
+    });
+  }
 });
 
 // --- Initial fetch ---
@@ -113,37 +141,80 @@ fetchNowPlaying().then(({ song, history }) => {
 
 // --- Entry ---
 
+const VOLUME_STEP = 0.1;
+
+function showNowPlayingNotification() {
+  const song = state.song;
+  if (!song) return;
+  const title = song.artist ? `${song.artist} - ${song.title}` : (song.title ?? '');
+  browser.notifications.create({
+    type: 'basic',
+    iconUrl: song.art ?? '',
+    title: 'jawr',
+    message: title,
+  });
+}
+
 export default defineBackground(() => {
+  browser.commands.onCommand.addListener((command) => {
+    switch (command) {
+      case 'toggle-radio':
+        if (state.playing) pause();
+        else play();
+        break;
+      case 'display-now-playing':
+        showNowPlayingNotification();
+        break;
+      case 'lower-volume': {
+        const value = Math.max(0, Math.round((state.volume.value - VOLUME_STEP) * 100) / 100);
+        const volume = { ...state.volume, value };
+        saveVolume(volume);
+        applyVolume(volume);
+        setState({ volume });
+        break;
+      }
+      case 'raise-volume': {
+        const value = Math.min(1, Math.round((state.volume.value + VOLUME_STEP) * 100) / 100);
+        const volume = { ...state.volume, value };
+        saveVolume(volume);
+        applyVolume(volume);
+        setState({ volume });
+        break;
+      }
+    }
+  });
+
   browser.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
+    if (message.target !== 'background') return false;
     switch (message.type) {
       case 'GET_STATE':
         sendResponse(state);
-        break;
+        return false;
       case 'PLAY':
         play();
-        break;
+        return false;
       case 'PAUSE':
         pause();
-        break;
+        return false;
       case 'TOGGLE_MUTE': {
         const volume = { ...state.volume, isMuted: !state.volume.isMuted };
         saveVolume(volume);
         applyVolume(volume);
         setState({ volume });
-        break;
+        return false;
       }
       case 'SET_VOLUME': {
         const volume = { ...state.volume, value: message.payload };
         saveVolume(volume);
         applyVolume(volume);
         setState({ volume });
-        break;
+        return false;
       }
       case 'OFFSCREEN_ERROR':
         setState({ playing: false });
-        break;
+        return false;
     }
-    return true;
+    return false;
   });
 
   applyVolume(state.volume);
