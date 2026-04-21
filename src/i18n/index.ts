@@ -15,6 +15,8 @@ export function loadLocale(): Locale {
     const raw = localStorage.getItem('jawr_locale');
     if (raw === 'pt' || raw === 'en') return raw;
   } catch {}
+  const lang = navigator.language?.toLowerCase() ?? '';
+  if (lang.startsWith('pt')) return 'pt';
   return 'en';
 }
 

@@ -8,11 +8,13 @@ export default defineConfig({
   vite: () => ({
     plugins: [tailwindcss()],
   }),
-  manifest: {
+  manifest: ({ browser }) => ({
     name: 'jawr',
     description: 'a web-based radio that helps you find a new track to love! - jawr.org',
     version: '2026.1.0.0',
-    permissions: ['offscreen', 'notifications', 'storage'],
+    permissions: browser === 'chrome'
+      ? ['offscreen', 'notifications', 'storage']
+      : ['notifications', 'storage'],
     commands: {
       'toggle-radio': {
         description: 'Toggle Radio',
@@ -27,5 +29,5 @@ export default defineConfig({
         description: 'Raise Radio Volume',
       },
     },
-  },
+  }),
 });
