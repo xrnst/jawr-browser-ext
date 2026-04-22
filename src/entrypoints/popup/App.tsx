@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { RadioPlayer } from '../../components/RadioPlayer';
 import type { ExtensionMessage, ExtensionState } from '../../types';
-import { loadTheme, saveTheme, loadNotifications, saveNotifications, loadArtistLinks, saveArtistLinks, loadCompactMode, saveCompactMode, type Theme } from '../../utils/storage';
+import { loadTheme, saveTheme, loadNotifications, saveNotifications, loadArtistLinks, saveArtistLinks, loadCompactMode, saveCompactMode, loadLastfmSession, type Theme } from '../../utils/storage';
 import { loadLocale, saveLocale, getTranslations, type Locale } from '../../i18n';
 
 const DEFAULT_STATE: ExtensionState = {
@@ -9,13 +9,17 @@ const DEFAULT_STATE: ExtensionState = {
   song: null,
   history: [],
   volume: { value: 0.5, isMuted: false },
+  lastfmSession: null,
 };
 
 type PopupOut =
   | { type: 'PLAY' }
   | { type: 'PAUSE' }
   | { type: 'TOGGLE_MUTE' }
-  | { type: 'SET_VOLUME'; payload: number };
+  | { type: 'SET_VOLUME'; payload: number }
+  | { type: 'LASTFM_CONNECT' }
+  | { type: 'LASTFM_CONFIRM' }
+  | { type: 'LASTFM_DISCONNECT' };
 
 function toBg(msg: PopupOut) {
   browser.runtime.sendMessage({ target: 'background', ...msg } satisfies ExtensionMessage).catch(() => {});
@@ -28,6 +32,7 @@ export default function App() {
   const [artistLinks, setArtistLinks] = useState(true);
   const [compactMode, setCompactMode] = useState(false);
   const [locale, setLocale] = useState<Locale>(loadLocale);
+  const [lastfmPending, setLastfmPending] = useState(false);
   const isMounted = useRef(false);
 
   useEffect(() => {
@@ -89,6 +94,20 @@ export default function App() {
     saveLocale(l);
   }
 
+  function handleLastfmConnect() {
+    setLastfmPending(true);
+    toBg({ type: 'LASTFM_CONNECT' });
+  }
+
+  function handleLastfmConfirm() {
+    setLastfmPending(false);
+    toBg({ type: 'LASTFM_CONFIRM' });
+  }
+
+  function handleLastfmDisconnect() {
+    toBg({ type: 'LASTFM_DISCONNECT' });
+  }
+
   return (
     <RadioPlayer
       state={state}
@@ -107,6 +126,11 @@ export default function App() {
       onPause={() => toBg({ type: 'PAUSE' })}
       onToggleMute={() => toBg({ type: 'TOGGLE_MUTE' })}
       onSetVolume={(v) => toBg({ type: 'SET_VOLUME', payload: v })}
+      lastfmSession={state.lastfmSession}
+      lastfmPending={lastfmPending}
+      onLastfmConnect={handleLastfmConnect}
+      onLastfmConfirm={handleLastfmConfirm}
+      onLastfmDisconnect={handleLastfmDisconnect}
     />
   );
 }
