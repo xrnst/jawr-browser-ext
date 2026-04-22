@@ -1,3 +1,5 @@
+import type { LastfmSession } from '../utils/lastfm';
+
 export type Song = {
   artist?: string;
   title?: string;
@@ -19,6 +21,7 @@ export type ExtensionState = {
   song: Song | null;
   history: HistoryItem[];
   volume: VolumeState;
+  lastfmSession: LastfmSession | null;
 };
 
 export type MessageTarget = 'background' | 'popup' | 'offscreen';
@@ -34,4 +37,7 @@ export type ExtensionMessage =
   | { target: 'offscreen'; type: 'OFFSCREEN_PLAY'; payload: string }
   | { target: 'offscreen'; type: 'OFFSCREEN_PAUSE' }
   | { target: 'offscreen'; type: 'OFFSCREEN_SET_VOLUME'; payload: number }
-  | { target: 'offscreen'; type: 'OFFSCREEN_SET_MUTED'; payload: boolean };
+  | { target: 'offscreen'; type: 'OFFSCREEN_SET_MUTED'; payload: boolean }
+  | { target: 'background'; type: 'LASTFM_CONNECT' }
+  | { target: 'background'; type: 'LASTFM_CONFIRM' }
+  | { target: 'background'; type: 'LASTFM_DISCONNECT' };
