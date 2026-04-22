@@ -1,6 +1,6 @@
 import type { ExtensionMessage, ExtensionState, Song, VolumeState } from '../types';
 import { fetchNowPlaying } from '../utils/api';
-import { getToken, buildAuthUrl, getSession, scrobble } from '../utils/lastfm';
+import { getToken, buildAuthUrl, getSession, scrobble, updateNowPlaying } from '../utils/lastfm';
 import { loadLastfmSession, loadPendingLastfmToken, loadNotifications, loadVolume, saveLastfmSession, savePendingLastfmToken, saveVolume } from '../utils/storage';
 import { createWebSocketManager } from '../utils/websocket';
 
@@ -113,7 +113,12 @@ async function chromeSendVolume(volume: VolumeState) {
 async function play() {
   if (isFirefox()) firefoxPlay();
   else await chromePlay();
-  if (state.song) resetScrobbleTimer(state.song);
+  if (state.song) {
+    if (state.lastfmSession && state.song.artist && state.song.title) {
+      updateNowPlaying(state.lastfmSession.key, state.song.artist, state.song.title).catch(() => {});
+    }
+    resetScrobbleTimer(state.song);
+  }
 }
 
 function pause() {
@@ -149,6 +154,9 @@ createWebSocketManager(WS_URL, ({ song, history }) => {
   const changed = song && (song.title !== prev?.title || song.artist !== prev?.artist);
   setState({ song, history });
   if (changed && song && state.playing) {
+    if (state.lastfmSession && song.artist && song.title) {
+      updateNowPlaying(state.lastfmSession.key, song.artist, song.title).catch(() => {});
+    }
     resetScrobbleTimer(song);
     loadNotifications().then((enabled) => {
       if (!enabled) return;

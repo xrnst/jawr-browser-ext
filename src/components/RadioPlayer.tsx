@@ -14,6 +14,7 @@ import type { Theme } from '../utils/storage';
 import type { Locale, Translations } from '../i18n';
 import type { ExtensionState } from '../types';
 import { timeAgo } from '../utils/date';
+import type { LastfmSession } from '../utils/lastfm';
 
 type Props = {
   state: ExtensionState;
@@ -32,6 +33,11 @@ type Props = {
   onPause: () => void;
   onToggleMute: () => void;
   onSetVolume: (v: number) => void;
+  lastfmSession: LastfmSession | null;
+  lastfmPending: boolean;
+  onLastfmConnect: () => void;
+  onLastfmConfirm: () => void;
+  onLastfmDisconnect: () => void;
 };
 
 const THEME_OPTIONS: { value: Theme; Icon: typeof SunIcon; key: keyof Translations }[] = [
@@ -45,7 +51,7 @@ const LOCALE_OPTIONS: { value: Locale; label: string }[] = [
 ];
 
 
-export function RadioPlayer({ state, theme, notifications, artistLinks, compactMode, locale, t, onToggleTheme, onToggleNotifications, onToggleArtistLinks, onToggleCompactMode, onSetLocale, onPlay, onPause, onToggleMute, onSetVolume }: Props) {
+export function RadioPlayer({ state, theme, notifications, artistLinks, compactMode, locale, t, onToggleTheme, onToggleNotifications, onToggleArtistLinks, onToggleCompactMode, onSetLocale, onPlay, onPause, onToggleMute, onSetVolume, lastfmSession, lastfmPending, onLastfmConnect, onLastfmConfirm, onLastfmDisconnect }: Props) {
   const { playing, song, history, volume } = state;
   const [showSettings, setShowSettings] = useState(false);
 
@@ -195,6 +201,44 @@ export function RadioPlayer({ state, theme, notifications, artistLinks, compactM
                   />
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* last.fm */}
+          <div className="flex flex-col gap-2.5">
+            <p className="text-[10px] tracking-[0.15em] uppercase text-gray-400 dark:text-[#6e6e6e]">{t.settings_lastfm}</p>
+            <div className="flex items-center justify-between">
+              {lastfmSession ? (
+                <>
+                  <span className="text-xs text-gray-600 dark:text-[#b0b0b0] flex items-center gap-1.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                    {lastfmSession.name}
+                  </span>
+                  <button
+                    onClick={onLastfmDisconnect}
+                    className="text-xs text-gray-400 dark:text-[#6e6e6e] hover:text-gray-900 dark:hover:text-[#f0f0f0] transition-colors cursor-pointer underline"
+                  >
+                    {t.lastfm_disconnect}
+                  </button>
+                </>
+              ) : lastfmPending ? (
+                <>
+                  <span className="text-xs text-gray-400 dark:text-[#6e6e6e]">{t.lastfm_pending}</span>
+                  <button
+                    onClick={onLastfmConfirm}
+                    className="text-xs text-gray-400 dark:text-[#6e6e6e] hover:text-gray-900 dark:hover:text-[#f0f0f0] transition-colors cursor-pointer underline"
+                  >
+                    {t.lastfm_confirm}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={onLastfmConnect}
+                  className="text-xs text-gray-400 dark:text-[#6e6e6e] hover:text-gray-900 dark:hover:text-[#f0f0f0] transition-colors cursor-pointer underline"
+                >
+                  {t.lastfm_connect}
+                </button>
+              )}
             </div>
           </div>
 

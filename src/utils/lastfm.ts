@@ -47,6 +47,23 @@ export async function getSession(token: string): Promise<LastfmSession> {
   return { key: data.session.key as string, name: data.session.name as string };
 }
 
+export async function updateNowPlaying(
+  sessionKey: string,
+  artist: string,
+  track: string,
+): Promise<void> {
+  const params: Record<string, string> = {
+    method: 'track.updateNowPlaying',
+    api_key: API_KEY,
+    sk: sessionKey,
+    artist,
+    track,
+  };
+  const sig = sign(params);
+  const body = new URLSearchParams({ ...params, api_sig: sig, format: 'json' });
+  await fetch(API_URL, { method: 'POST', body });
+}
+
 export async function scrobble(
   sessionKey: string,
   artist: string,
