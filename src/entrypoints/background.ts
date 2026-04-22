@@ -257,7 +257,25 @@ export default defineBackground(() => {
             pendingLastfmToken = token;
             savePendingLastfmToken(token);
             setState({ lastfmPending: true });
-            browser.tabs.create({ url: buildAuthUrl(token) });
+            browser.tabs.create({ url: buildAuthUrl(token) }).then((tab) => {
+              const tabId = tab.id;
+              if (tabId === undefined) return;
+              const onRemoved = (removedTabId: number) => {
+                if (removedTabId !== tabId) return;
+                browser.tabs.onRemoved.removeListener(onRemoved);
+                if (!pendingLastfmToken) return;
+                const t = pendingLastfmToken;
+                pendingLastfmToken = null;
+                savePendingLastfmToken(null);
+                getSession(t)
+                  .then((session) => {
+                    saveLastfmSession(session);
+                    setState({ lastfmSession: session, lastfmPending: false });
+                  })
+                  .catch(() => setState({ lastfmPending: false }));
+              };
+              browser.tabs.onRemoved.addListener(onRemoved);
+            });
           })
           .catch(() => {});
         return false;
