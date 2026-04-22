@@ -20,4 +20,9 @@ export default {
   settings_display: 'display',
   settings_artist_links: 'hide links',
   settings_compact_mode: 'compact mode',
+  settings_lastfm: 'last.fm',
+  lastfm_connect: 'connect',
+  lastfm_confirm: 'confirm',
+  lastfm_disconnect: 'disconnect',
+  lastfm_pending: 'waiting...',
 } as const;
