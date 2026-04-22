@@ -10,6 +10,7 @@ const DEFAULT_STATE: ExtensionState = {
   history: [],
   volume: { value: 0.5, isMuted: false },
   lastfmSession: null,
+  lastfmPending: false,
 };
 
 type PopupOut =
@@ -32,7 +33,6 @@ export default function App() {
   const [artistLinks, setArtistLinks] = useState(true);
   const [compactMode, setCompactMode] = useState(false);
   const [locale, setLocale] = useState<Locale>(loadLocale);
-  const [lastfmPending, setLastfmPending] = useState(false);
   const isMounted = useRef(false);
 
   useEffect(() => {
@@ -95,12 +95,10 @@ export default function App() {
   }
 
   function handleLastfmConnect() {
-    setLastfmPending(true);
     toBg({ type: 'LASTFM_CONNECT' });
   }
 
   function handleLastfmConfirm() {
-    setLastfmPending(false);
     toBg({ type: 'LASTFM_CONFIRM' });
   }
 
@@ -127,7 +125,7 @@ export default function App() {
       onToggleMute={() => toBg({ type: 'TOGGLE_MUTE' })}
       onSetVolume={(v) => toBg({ type: 'SET_VOLUME', payload: v })}
       lastfmSession={state.lastfmSession}
-      lastfmPending={lastfmPending}
+      lastfmPending={state.lastfmPending}
       onLastfmConnect={handleLastfmConnect}
       onLastfmConfirm={handleLastfmConfirm}
       onLastfmDisconnect={handleLastfmDisconnect}

@@ -1,7 +1,7 @@
 import type { ExtensionMessage, ExtensionState, Song, VolumeState } from '../types';
 import { fetchNowPlaying } from '../utils/api';
 import { getToken, buildAuthUrl, getSession, scrobble } from '../utils/lastfm';
-import { loadLastfmSession, loadNotifications, loadVolume, saveLastfmSession, saveVolume } from '../utils/storage';
+import { loadLastfmSession, loadPendingLastfmToken, loadNotifications, loadVolume, saveLastfmSession, savePendingLastfmToken, saveVolume } from '../utils/storage';
 import { createWebSocketManager } from '../utils/websocket';
 
 const STREAM_URL = `${import.meta.env.VITE_AZURACAST_URL}/listen/jawr/radio.mp3`;
@@ -13,14 +13,16 @@ let state: ExtensionState = {
   history: [],
   volume: loadVolume(),
   lastfmSession: null,
+  lastfmPending: false,
 };
 
 let pendingLastfmToken: string | null = null;
 let scrobbleTimer: ReturnType<typeof setTimeout> | null = null;
 let trackStartTimestamp = 0;
 
-loadLastfmSession().then((session) => {
-  state = { ...state, lastfmSession: session };
+Promise.all([loadLastfmSession(), loadPendingLastfmToken()]).then(([session, token]) => {
+  pendingLastfmToken = token;
+  state = { ...state, lastfmSession: session, lastfmPending: token !== null };
 });
 
 function broadcastToPopup(msg: ExtensionMessage) {
@@ -245,6 +247,8 @@ export default defineBackground(() => {
         getToken()
           .then((token) => {
             pendingLastfmToken = token;
+            savePendingLastfmToken(token);
+            setState({ lastfmPending: true });
             browser.tabs.create({ url: buildAuthUrl(token) });
           })
           .catch(() => {});
@@ -254,17 +258,20 @@ export default defineBackground(() => {
         if (!pendingLastfmToken) return false;
         const token = pendingLastfmToken;
         pendingLastfmToken = null;
+        savePendingLastfmToken(null);
         getSession(token)
           .then((session) => {
             saveLastfmSession(session);
-            setState({ lastfmSession: session });
+            setState({ lastfmSession: session, lastfmPending: false });
           })
           .catch(() => {});
         return false;
       }
       case 'LASTFM_DISCONNECT': {
+        pendingLastfmToken = null;
+        savePendingLastfmToken(null);
         saveLastfmSession(null);
-        setState({ lastfmSession: null });
+        setState({ lastfmSession: null, lastfmPending: false });
         if (scrobbleTimer) {
           clearTimeout(scrobbleTimer);
           scrobbleTimer = null;

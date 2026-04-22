@@ -22,6 +22,7 @@ export type ExtensionState = {
   history: HistoryItem[];
   volume: VolumeState;
   lastfmSession: LastfmSession | null;
+  lastfmPending: boolean;
 };
 
 export type MessageTarget = 'background' | 'popup' | 'offscreen';

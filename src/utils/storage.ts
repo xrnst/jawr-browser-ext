@@ -99,3 +99,21 @@ export async function saveLastfmSession(session: LastfmSession | null): Promise<
     }
   } catch {}
 }
+
+export async function loadPendingLastfmToken(): Promise<string | null> {
+  try {
+    const result = await browser.storage.local.get('jawr_lastfm_pending_token');
+    if ('jawr_lastfm_pending_token' in result) return result.jawr_lastfm_pending_token as string;
+  } catch {}
+  return null;
+}
+
+export async function savePendingLastfmToken(token: string | null): Promise<void> {
+  try {
+    if (token === null) {
+      await browser.storage.local.remove('jawr_lastfm_pending_token');
+    } else {
+      await browser.storage.local.set({ jawr_lastfm_pending_token: token });
+    }
+  } catch {}
+}
