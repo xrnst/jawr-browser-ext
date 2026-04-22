@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { RadioPlayer } from '../../components/RadioPlayer';
 import type { ExtensionMessage, ExtensionState } from '../../types';
-import { loadTheme, saveTheme, loadNotifications, saveNotifications, loadArtistLinks, saveArtistLinks, loadCompactMode, saveCompactMode, loadLastfmSession, type Theme } from '../../utils/storage';
+import { loadTheme, saveTheme, loadNotifications, saveNotifications, loadArtistLinks, saveArtistLinks, loadCompactMode, saveCompactMode, type Theme } from '../../utils/storage';
 import { loadLocale, saveLocale, getTranslations, type Locale } from '../../i18n';
 
 const DEFAULT_STATE: ExtensionState = {
