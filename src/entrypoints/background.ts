@@ -71,10 +71,10 @@ const OFFSCREEN_URL = 'offscreen.html';
 
 async function hasOffscreenDocument(): Promise<boolean> {
   const url = chrome.runtime.getURL(OFFSCREEN_URL);
-  const contexts = await chrome.runtime.getContexts({
-    contextTypes: ['OFFSCREEN_DOCUMENT'],
+  const contexts = (await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT' as chrome.runtime.ContextType],
     documentUrls: [url],
-  });
+  })) as chrome.runtime.ExtensionContext[];
   return contexts.length > 0;
 }
 
@@ -149,33 +149,26 @@ function resetScrobbleTimer(song: Song) {
   }, 60_000);
 }
 
-createWebSocketManager(WS_URL, ({ song, history }) => {
+function handleNowPlayingUpdate({ song, history }: { song: Song | null; history: ExtensionState['history'] }) {
   const prev = state.song;
   const changed = song && (song.title !== prev?.title || song.artist !== prev?.artist);
   setState({ song, history });
-  if (changed && song && state.playing) {
-    if (state.lastfmSession && song.artist && song.title) {
-      updateNowPlaying(state.lastfmSession.key, song.artist, song.title).catch(() => {});
-    }
-    resetScrobbleTimer(song);
-    loadNotifications().then((enabled) => {
-      if (!enabled) return;
-      const title = song.artist ? `${song.artist} - ${song.title}` : (song.title ?? '');
-      browser.notifications.create({
-        type: 'basic',
-        iconUrl: song.art ?? '',
-        title: 'jawr',
-        message: title,
-      });
-    });
+  if (!changed || !song || !state.playing) return;
+  if (state.lastfmSession && song.artist && song.title) {
+    updateNowPlaying(state.lastfmSession.key, song.artist, song.title).catch(() => {});
   }
-});
-
-// --- Initial fetch ---
-
-fetchNowPlaying().then(({ song, history }) => {
-  setState({ song, history });
-});
+  resetScrobbleTimer(song);
+  loadNotifications().then((enabled) => {
+    if (!enabled) return;
+    const title = song.artist ? `${song.artist} - ${song.title}` : (song.title ?? '');
+    browser.notifications.create({
+      type: 'basic',
+      iconUrl: song.art ?? '',
+      title: 'jawr',
+      message: title,
+    });
+  });
+}
 
 // --- Entry ---
 
@@ -194,6 +187,12 @@ function showNowPlayingNotification() {
 }
 
 export default defineBackground(() => {
+  createWebSocketManager(WS_URL, handleNowPlayingUpdate);
+
+  fetchNowPlaying().then(({ song, history }) => {
+    setState({ song, history });
+  });
+
   browser.commands.onCommand.addListener((command) => {
     switch (command) {
       case 'toggle-radio':
@@ -222,35 +221,36 @@ export default defineBackground(() => {
     }
   });
 
-  browser.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
-    if (message.target !== 'background') return false;
+  browser.runtime.onMessage.addListener((rawMessage, _sender, sendResponse) => {
+    const message = rawMessage as ExtensionMessage;
+    if (message.target !== 'background') return true;
     switch (message.type) {
       case 'GET_STATE':
         sendResponse(state);
-        return false;
+        return true;
       case 'PLAY':
         play();
-        return false;
+        return true;
       case 'PAUSE':
         pause();
-        return false;
+        return true;
       case 'TOGGLE_MUTE': {
         const volume = { ...state.volume, isMuted: !state.volume.isMuted };
         saveVolume(volume);
         applyVolume(volume);
         setState({ volume });
-        return false;
+        return true;
       }
       case 'SET_VOLUME': {
         const volume = { ...state.volume, value: message.payload };
         saveVolume(volume);
         applyVolume(volume);
         setState({ volume });
-        return false;
+        return true;
       }
       case 'OFFSCREEN_ERROR':
         setState({ playing: false });
-        return false;
+        return true;
       case 'LASTFM_CONNECT': {
         getToken()
           .then((token) => {
@@ -275,10 +275,10 @@ export default defineBackground(() => {
             }, 3000);
           })
           .catch(() => {});
-        return false;
+        return true;
       }
       case 'LASTFM_CONFIRM': {
-        if (!pendingLastfmToken) return false;
+        if (!pendingLastfmToken) return true;
         const token = pendingLastfmToken;
         pendingLastfmToken = null;
         savePendingLastfmToken(null);
@@ -288,7 +288,7 @@ export default defineBackground(() => {
             setState({ lastfmSession: session, lastfmPending: false });
           })
           .catch(() => {});
-        return false;
+        return true;
       }
       case 'LASTFM_DISCONNECT': {
         pendingLastfmToken = null;
@@ -299,10 +299,10 @@ export default defineBackground(() => {
           clearTimeout(scrobbleTimer);
           scrobbleTimer = null;
         }
-        return false;
+        return true;
       }
     }
-    return false;
+    return true;
   });
 
   applyVolume(state.volume);

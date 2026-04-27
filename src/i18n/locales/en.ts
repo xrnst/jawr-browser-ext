@@ -25,4 +25,6 @@ export default {
   lastfm_confirm: 'confirm',
   lastfm_disconnect: 'disconnect',
   lastfm_pending: 'waiting...',
+  support_artist_button: 'support this artist',
+  support_artist_title: 'support',
 } as const;

@@ -55,17 +55,17 @@ export default function App() {
   useEffect(() => {
     browser.runtime
       .sendMessage({ target: 'background', type: 'GET_STATE' } satisfies ExtensionMessage)
-      .then((response: ExtensionState) => {
-        if (response) setState(response);
+      .then((response) => {
+        if (response) setState(response as ExtensionState);
       })
       .catch(() => {});
 
-    const listener = (message: ExtensionMessage) => {
-      if (message.target !== 'popup') return false;
+    const listener = (rawMessage: unknown) => {
+      const message = rawMessage as ExtensionMessage;
+      if (message.target !== 'popup') return;
       if (message.type === 'STATE_UPDATE') {
         setState(message.payload);
       }
-      return false;
     };
     browser.runtime.onMessage.addListener(listener);
     return () => browser.runtime.onMessage.removeListener(listener);

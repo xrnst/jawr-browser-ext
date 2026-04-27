@@ -4,7 +4,7 @@ import pt from './locales/pt';
 export type Locale = 'pt' | 'en';
 export type Translations = typeof pt;
 
-const locales: Record<Locale, Translations> = { pt, en };
+const locales: Record<Locale, Translations> = { pt, en: en as unknown as Translations };
 
 export function getTranslations(locale: Locale): Translations {
   return locales[locale];

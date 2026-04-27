@@ -54,6 +54,7 @@ const LOCALE_OPTIONS: { value: Locale; label: string }[] = [
 export function RadioPlayer({ state, theme, notifications, artistLinks, compactMode, locale, t, onToggleTheme, onToggleNotifications, onToggleArtistLinks, onToggleCompactMode, onSetLocale, onPlay, onPause, onToggleMute, onSetVolume, lastfmSession, lastfmPending, onLastfmConnect, onLastfmConfirm, onLastfmDisconnect }: Props) {
   const { playing, song, history, volume } = state;
   const [showSettings, setShowSettings] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
 
   return (
     <div className="flex flex-col w-80 min-h-[460px] bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-50 font-mono">
@@ -341,24 +342,13 @@ export function RadioPlayer({ state, theme, notifications, artistLinks, compactM
               <p className="text-gray-300 dark:text-[#3a3a3a]">—</p>
             )}
             {song?.artist && !artistLinks && (
-              <p className="text-xs text-gray-400 dark:text-[#6e6e6e] flex gap-2">
-                <a
-                  href={`https://www.last.fm/music/${encodeURIComponent(song.artist)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-gray-600 dark:hover:text-[#b0b0b0] transition-colors"
-                >
-                  [last.fm]
-                </a>
-                <a
-                  href={`https://www.discogs.com/search/?q=${encodeURIComponent(song.artist)}&type=artist`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-gray-600 dark:hover:text-[#b0b0b0] transition-colors"
-                >
-                  [discogs]
-                </a>
-              </p>
+              <button
+                type="button"
+                onClick={() => setShowSupport(true)}
+                className="text-xs text-gray-400 dark:text-[#6e6e6e] underline hover:text-gray-600 dark:hover:text-[#b0b0b0] transition-colors text-left cursor-pointer w-fit"
+              >
+                {t.support_artist_button}
+              </button>
             )}
           </div>
 
@@ -389,6 +379,75 @@ export function RadioPlayer({ state, theme, notifications, artistLinks, compactM
           </div>
         </>
       )}
+
+      {showSupport && song?.artist && (
+        <SupportArtistModal
+          artist={song.artist}
+          title={t.support_artist_title}
+          onClose={() => setShowSupport(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function SupportArtistModal({
+  artist,
+  title,
+  onClose,
+}: {
+  artist: string;
+  title: string;
+  onClose: () => void;
+}) {
+  const q = encodeURIComponent(artist);
+  const links = [
+    { label: 'bandcamp', href: `https://bandcamp.com/search?q=${q}&item_type=b` },
+    { label: 'soundcloud', href: `https://soundcloud.com/search/people?q=${q}` },
+    { label: 'spotify', href: `https://open.spotify.com/search/${q}/artists` },
+    { label: 'apple music', href: `https://music.apple.com/search?term=${q}` },
+    { label: 'youtube music', href: `https://music.youtube.com/search?q=${q}` },
+    { label: 'deezer', href: `https://www.deezer.com/search/${q}/artist` },
+    { label: 'discogs', href: `https://www.discogs.com/search/?q=${q}&type=artist` },
+    { label: 'last.fm', href: `https://www.last.fm/music/${q}` },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] w-full max-w-sm mx-4 flex flex-col gap-5 p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between">
+          <h2 className="text-sm font-bold text-gray-900 dark:text-[#f0f0f0]">
+            {title} {artist}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-700 dark:hover:text-[#f0f0f0] transition-colors cursor-pointer"
+          >
+            <XIcon />
+          </button>
+        </div>
+
+        <ul className="grid grid-cols-2 gap-2">
+          {links.map(({ label, href }) => (
+            <li key={label}>
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block px-3 py-2 text-xs text-gray-800 dark:text-[#f0f0f0] border border-gray-200 dark:border-[#2a2a2a] hover:bg-gray-100 dark:hover:bg-[#2a2a2a] transition-colors"
+              >
+                {label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
