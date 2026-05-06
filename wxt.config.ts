@@ -9,9 +9,10 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   manifest: ({ browser }) => ({
-    name: 'jawr',
-    description: 'a web-based radio that helps you find a new track to love! - jawr.org',
-    version: '2026.1.0.0',
+    name: 'jawr - just another web radio',
+    short_name: 'jawr',
+    description: 'discover new music on a curated 24/7 web radio',
+    version: '1.0',
     icons: {
       16: 'icons/16.png',
       32: 'icons/32.png',
