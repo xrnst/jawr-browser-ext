@@ -240,7 +240,7 @@ function handleNowPlayingUpdate({ song, history }: { song: Song | null; history:
     browser.notifications.create({
       type: 'basic',
       iconUrl: song.art ?? '',
-      title: 'jawr',
+      title: 'jawr.org',
       message: title,
     });
   });
@@ -257,7 +257,7 @@ function showNowPlayingNotification() {
   browser.notifications.create({
     type: 'basic',
     iconUrl: song.art ?? '',
-    title: 'jawr',
+    title: 'jawr.org',
     message: title,
   });
 }
