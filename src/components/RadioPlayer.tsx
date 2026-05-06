@@ -59,7 +59,7 @@ export function RadioPlayer({ state, theme, notifications, compactMode, locale, 
   const [showRequest, setShowRequest] = useState(false);
 
   return (
-    <div className="flex flex-col w-80 min-h-[460px] bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-50 font-mono">
+    <div className={`flex flex-col w-80 ${compactMode ? '' : 'min-h-[460px]'} bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-50 font-mono`}>
 
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-5 pb-4">
@@ -84,12 +84,12 @@ export function RadioPlayer({ state, theme, notifications, compactMode, locale, 
             </svg>
           </a>
           <span className="text-gray-300 dark:text-gray-600">/</span>
-          <span className="flex items-center gap-1.5">
+          <span className="flex items-center gap-2">
             <span
-              className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"
+              className="inline-block w-2 h-2 rounded-full bg-red-700 shrink-0"
               style={{ animation: 'pulse 2s ease-in-out infinite' }}
             />
-            <span className="text-[10px] tracking-[0.15em] uppercase text-red-500">{t.live_indicator}</span>
+            <span className="text-xs font-bold tracking-widest uppercase text-red-700">{t.live_indicator}</span>
           </span>
         </div>
         <button
@@ -237,7 +237,7 @@ export function RadioPlayer({ state, theme, notifications, compactMode, locale, 
 
           {typeof browser !== 'undefined' && !navigator.userAgent.includes('Firefox') && (
             <button
-              className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-[#6e6e6e] hover:text-gray-600 dark:hover:text-[#b0b0b0] transition-colors cursor-pointer"
+              className="self-start inline-flex items-center gap-1.5 text-xs text-gray-400 dark:text-[#6e6e6e] hover:text-gray-600 dark:hover:text-[#b0b0b0] transition-colors cursor-pointer"
               onClick={() => browser.tabs.create({ url: 'chrome://extensions/shortcuts' })}
             >
               <ArrowSquareOutIcon size={12} />
@@ -330,7 +330,7 @@ export function RadioPlayer({ state, theme, notifications, compactMode, locale, 
             ) : (
               <p className="text-gray-300 dark:text-[#3a3a3a]">—</p>
             )}
-            {song?.artist && (
+            {song?.artist && !compactMode && (
               <button
                 type="button"
                 onClick={() => setShowSupport(true)}
@@ -341,38 +341,42 @@ export function RadioPlayer({ state, theme, notifications, compactMode, locale, 
             )}
           </div>
 
-          <div className="h-px bg-gray-200 dark:bg-[#2a2a2a]" />
+          {!compactMode && (
+            <>
+              <div className="h-px bg-gray-200 dark:bg-[#2a2a2a]" />
 
-          {/* History */}
-          <div className="flex flex-col gap-3 px-5 pt-4 pb-5">
-            <p className="text-[10px] tracking-[0.15em] uppercase text-gray-400 dark:text-[#6e6e6e]">{t.recently_label}</p>
-            <ul className="flex flex-col text-[11px] text-gray-600 dark:text-[#b0b0b0]">
-              {history.length === 0 && (
-                <li className="text-gray-300 dark:text-[#3a3a3a]">—</li>
-              )}
-              {history.map(({ song: s, played_at }, i) => {
-                if (!s) return null;
-                const text = s.artist ? `${s.artist} - ${s.title}` : (s.title ?? '-');
-                const ago = played_at ? timeAgo(played_at) : '';
-                return (
-                  <li
-                    key={i}
-                    className="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-[#2a2a2a] last:border-0 overflow-hidden"
-                  >
-                    <span className="flex-1 truncate">{text}</span>
-                    {ago && <span className="text-gray-300 dark:text-[#3a3a3a] shrink-0">{ago}</span>}
-                  </li>
-                );
-              })}
-            </ul>
-            <button
-              type="button"
-              onClick={() => setShowRequest(true)}
-              className="self-start text-xs text-gray-400 dark:text-[#6e6e6e] underline hover:text-gray-600 dark:hover:text-[#b0b0b0] transition-colors cursor-pointer mt-2"
-            >
-              {t.song_request_button}
-            </button>
-          </div>
+              {/* History */}
+              <div className="flex flex-col gap-3 px-5 pt-4 pb-5">
+                <p className="text-[10px] tracking-[0.15em] uppercase text-gray-400 dark:text-[#6e6e6e]">{t.recently_label}</p>
+                <ul className="flex flex-col text-[11px] text-gray-600 dark:text-[#b0b0b0]">
+                  {history.length === 0 && (
+                    <li className="text-gray-300 dark:text-[#3a3a3a]">—</li>
+                  )}
+                  {history.map(({ song: s, played_at }, i) => {
+                    if (!s) return null;
+                    const text = s.artist ? `${s.artist} - ${s.title}` : (s.title ?? '-');
+                    const ago = played_at ? timeAgo(played_at) : '';
+                    return (
+                      <li
+                        key={i}
+                        className="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-[#2a2a2a] last:border-0 overflow-hidden"
+                      >
+                        <span className="flex-1 truncate">{text}</span>
+                        {ago && <span className="text-gray-300 dark:text-[#3a3a3a] shrink-0">{ago}</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => setShowRequest(true)}
+                  className="self-start text-xs text-gray-400 dark:text-[#6e6e6e] underline hover:text-gray-600 dark:hover:text-[#b0b0b0] transition-colors cursor-pointer mt-2"
+                >
+                  {t.song_request_button}
+                </button>
+              </div>
+            </>
+          )}
         </>
       )}
 
