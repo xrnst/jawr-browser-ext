@@ -39,6 +39,14 @@ export type ExtensionMessage =
   | { target: 'offscreen'; type: 'OFFSCREEN_PAUSE' }
   | { target: 'offscreen'; type: 'OFFSCREEN_SET_VOLUME'; payload: number }
   | { target: 'offscreen'; type: 'OFFSCREEN_SET_MUTED'; payload: boolean }
+  | { target: 'offscreen'; type: 'OFFSCREEN_FFT_START'; payload: number }
+  | { target: 'offscreen'; type: 'OFFSCREEN_FFT_STOP' }
+  | { target: 'offscreen'; type: 'OFFSCREEN_METADATA'; payload: Song | null }
+  | { target: 'background'; type: 'OFFSCREEN_MEDIA_PLAY' }
+  | { target: 'background'; type: 'OFFSCREEN_MEDIA_PAUSE' }
+  | { target: 'popup'; type: 'FFT_DATA'; payload: number[] }
+  | { target: 'background'; type: 'FFT_START'; payload: number }
+  | { target: 'background'; type: 'FFT_STOP' }
   | { target: 'background'; type: 'LASTFM_CONNECT' }
   | { target: 'background'; type: 'LASTFM_CONFIRM' }
   | { target: 'background'; type: 'LASTFM_DISCONNECT' };

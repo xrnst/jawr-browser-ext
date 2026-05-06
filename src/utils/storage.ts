@@ -24,12 +24,33 @@ export function saveVolume(state: VolumeState): void {
   }
 }
 
-export type Theme = 'light' | 'dark';
+export type Theme =
+  | 'light'
+  | 'dark'
+  | 'amoled'
+  | 'nord'
+  | 'city-lights'
+  | 'dracula'
+  | 'catppuccin'
+  | 'gruvbox'
+  | 'everforest';
+
+export const THEMES: Theme[] = [
+  'light',
+  'dark',
+  'amoled',
+  'nord',
+  'city-lights',
+  'dracula',
+  'catppuccin',
+  'gruvbox',
+  'everforest',
+];
 
 export function loadTheme(): Theme {
   try {
-    const raw = localStorage.getItem(THEME_KEY);
-    if (raw === 'light' || raw === 'dark') return raw;
+    const raw = localStorage.getItem(THEME_KEY) as Theme | null;
+    if (raw && THEMES.includes(raw)) return raw;
   } catch {}
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
@@ -51,20 +72,6 @@ export async function loadNotifications(): Promise<boolean> {
 export async function saveNotifications(enabled: boolean): Promise<void> {
   try {
     await browser.storage.local.set({ jawr_notifications: enabled });
-  } catch {}
-}
-
-export async function loadArtistLinks(): Promise<boolean> {
-  try {
-    const result = await browser.storage.local.get('jawr_artist_links');
-    if ('jawr_artist_links' in result) return result.jawr_artist_links as boolean;
-  } catch {}
-  return false;
-}
-
-export async function saveArtistLinks(enabled: boolean): Promise<void> {
-  try {
-    await browser.storage.local.set({ jawr_artist_links: enabled });
   } catch {}
 }
 

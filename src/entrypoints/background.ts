@@ -1,6 +1,9 @@
 import type { ExtensionMessage, ExtensionState, Song, VolumeState } from '../types';
 import { fetchNowPlaying } from '../utils/api';
+import { computeFrequencyBands, FFT_SIZE, FFT_SMOOTHING, STREAM_INTERVAL_MS } from '../utils/fft';
 import { getToken, buildAuthUrl, getSession, scrobble, updateNowPlaying } from '../utils/lastfm';
+import { registerMediaActions, setMediaMetadata, setMediaPlaybackState } from '../utils/media-session';
+import { createReconnector } from '../utils/reconnect';
 import { loadLastfmSession, loadPendingLastfmToken, loadNotifications, loadVolume, saveLastfmSession, savePendingLastfmToken, saveVolume } from '../utils/storage';
 import { createWebSocketManager } from '../utils/websocket';
 
@@ -30,32 +33,104 @@ function broadcastToPopup(msg: ExtensionMessage) {
 }
 
 function setState(partial: Partial<ExtensionState>) {
+  const songChanged = 'song' in partial && partial.song !== state.song;
   state = { ...state, ...partial };
   broadcastToPopup({ target: 'popup', type: 'STATE_UPDATE', payload: state });
+  if (songChanged) propagateMetadata(state.song);
+}
+
+function propagateMetadata(song: Song | null) {
+  if (isFirefox()) setMediaMetadata(song);
+  else chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_METADATA', payload: song });
 }
 
 // --- Firefox: direct audio ---
 let firefoxAudio: HTMLAudioElement | null = null;
+let firefoxAudioCtx: AudioContext | null = null;
+let firefoxAnalyser: AnalyserNode | null = null;
+let firefoxFftBuffer: Uint8Array<ArrayBuffer> | null = null;
+let firefoxFftInterval: ReturnType<typeof setInterval> | null = null;
+let firefoxFftBars = 5;
 
 function isFirefox(): boolean {
   return typeof navigator !== 'undefined' && navigator.userAgent.includes('Firefox');
 }
 
-function firefoxPlay() {
-  if (!firefoxAudio) {
-    firefoxAudio = new Audio();
-    firefoxAudio.preload = 'none';
+function firefoxEnsureAnalyser() {
+  if (firefoxAnalyser || !firefoxAudio) return;
+  firefoxAudioCtx = new AudioContext();
+  const source = firefoxAudioCtx.createMediaElementSource(firefoxAudio);
+  firefoxAnalyser = firefoxAudioCtx.createAnalyser();
+  firefoxAnalyser.fftSize = FFT_SIZE;
+  firefoxAnalyser.smoothingTimeConstant = FFT_SMOOTHING;
+  source.connect(firefoxAnalyser);
+  firefoxAnalyser.connect(firefoxAudioCtx.destination);
+  firefoxFftBuffer = new Uint8Array(firefoxAnalyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
+}
+
+function firefoxFftTick() {
+  if (!firefoxAnalyser || !firefoxFftBuffer) return;
+  const bands = computeFrequencyBands(firefoxAnalyser, firefoxFftBuffer, firefoxFftBars);
+  browser.runtime
+    .sendMessage({ target: 'popup', type: 'FFT_DATA', payload: bands } satisfies ExtensionMessage)
+    .catch(() => {});
+}
+
+function firefoxStartFft(bars: number) {
+  firefoxFftBars = Math.max(1, Math.floor(bars));
+  if (!firefoxAudio || firefoxAudio.paused) return;
+  firefoxEnsureAnalyser();
+  if (firefoxAudioCtx?.state === 'suspended') firefoxAudioCtx.resume().catch(() => {});
+  if (firefoxFftInterval !== null) return;
+  firefoxFftInterval = setInterval(firefoxFftTick, STREAM_INTERVAL_MS);
+}
+
+function firefoxStopFft() {
+  if (firefoxFftInterval !== null) {
+    clearInterval(firefoxFftInterval);
+    firefoxFftInterval = null;
   }
-  firefoxAudio.volume = state.volume.value;
-  firefoxAudio.muted = state.volume.isMuted;
+}
+
+const firefoxReconnector = createReconnector(() => {
+  if (!firefoxAudio) return Promise.reject();
   firefoxAudio.src = STREAM_URL;
-  firefoxAudio.play().catch(() => setState({ playing: false }));
+  return firefoxAudio.play();
+});
+
+function firefoxEnsureAudioElement(): HTMLAudioElement {
+  if (firefoxAudio) return firefoxAudio;
+  const el = new Audio();
+  el.preload = 'none';
+  el.crossOrigin = 'anonymous';
+  el.addEventListener('error', firefoxReconnector.schedule);
+  el.addEventListener('stalled', firefoxReconnector.schedule);
+  el.addEventListener('ended', firefoxReconnector.schedule);
+  registerMediaActions({ onPlay: () => play(), onPause: () => pause() });
+  firefoxAudio = el;
+  return el;
+}
+
+function firefoxPlay() {
+  firefoxReconnector.arm();
+  const el = firefoxEnsureAudioElement();
+  el.volume = state.volume.value;
+  el.muted = state.volume.isMuted;
+  el.src = STREAM_URL;
+  el.play()
+    .then(() => firefoxEnsureAnalyser())
+    .catch(() => setState({ playing: false }));
+  setMediaPlaybackState('playing');
+  setMediaMetadata(state.song);
   setState({ playing: true });
 }
 
 function firefoxPause() {
+  firefoxReconnector.cancel();
+  firefoxStopFft();
   firefoxAudio?.pause();
   if (firefoxAudio) firefoxAudio.src = '';
+  setMediaPlaybackState('paused');
   setState({ playing: false });
 }
 
@@ -95,6 +170,7 @@ async function chromeSendToOffscreen(msg: ExtensionMessage) {
 async function chromePlay() {
   await chromeEnsureOffscreen();
   await chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_PLAY', payload: STREAM_URL });
+  await chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_METADATA', payload: state.song });
   setState({ playing: true });
 }
 
@@ -223,34 +299,48 @@ export default defineBackground(() => {
 
   browser.runtime.onMessage.addListener((rawMessage, _sender, sendResponse) => {
     const message = rawMessage as ExtensionMessage;
-    if (message.target !== 'background') return true;
+    if (message.target !== 'background') return false;
     switch (message.type) {
       case 'GET_STATE':
         sendResponse(state);
         return true;
       case 'PLAY':
         play();
-        return true;
+        return false;
       case 'PAUSE':
         pause();
-        return true;
+        return false;
       case 'TOGGLE_MUTE': {
         const volume = { ...state.volume, isMuted: !state.volume.isMuted };
         saveVolume(volume);
         applyVolume(volume);
         setState({ volume });
-        return true;
+        return false;
       }
       case 'SET_VOLUME': {
         const volume = { ...state.volume, value: message.payload };
         saveVolume(volume);
         applyVolume(volume);
         setState({ volume });
-        return true;
+        return false;
       }
       case 'OFFSCREEN_ERROR':
         setState({ playing: false });
-        return true;
+        return false;
+      case 'OFFSCREEN_MEDIA_PLAY':
+        play();
+        return false;
+      case 'OFFSCREEN_MEDIA_PAUSE':
+        pause();
+        return false;
+      case 'FFT_START':
+        if (isFirefox()) firefoxStartFft(message.payload);
+        else chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_FFT_START', payload: message.payload });
+        return false;
+      case 'FFT_STOP':
+        if (isFirefox()) firefoxStopFft();
+        else chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_FFT_STOP' });
+        return false;
       case 'LASTFM_CONNECT': {
         getToken()
           .then((token) => {
@@ -275,10 +365,10 @@ export default defineBackground(() => {
             }, 3000);
           })
           .catch(() => {});
-        return true;
+        return false;
       }
       case 'LASTFM_CONFIRM': {
-        if (!pendingLastfmToken) return true;
+        if (!pendingLastfmToken) return false;
         const token = pendingLastfmToken;
         pendingLastfmToken = null;
         savePendingLastfmToken(null);
@@ -288,7 +378,7 @@ export default defineBackground(() => {
             setState({ lastfmSession: session, lastfmPending: false });
           })
           .catch(() => {});
-        return true;
+        return false;
       }
       case 'LASTFM_DISCONNECT': {
         pendingLastfmToken = null;
@@ -299,10 +389,10 @@ export default defineBackground(() => {
           clearTimeout(scrobbleTimer);
           scrobbleTimer = null;
         }
-        return true;
+        return false;
       }
     }
-    return true;
+    return false;
   });
 
   applyVolume(state.volume);

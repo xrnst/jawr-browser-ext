@@ -12,21 +12,29 @@ export default defineConfig({
     name: 'jawr',
     description: 'a web-based radio that helps you find a new track to love! - jawr.org',
     version: '2026.1.0.0',
+    icons: {
+      16: 'icons/16.png',
+      32: 'icons/32.png',
+      48: 'icons/48.png',
+      96: 'icons/96.png',
+      128: 'icons/128.png',
+    },
     permissions: browser === 'chrome'
       ? ['offscreen', 'notifications', 'storage']
       : ['notifications', 'storage'],
+    host_permissions: ['https://jawr.org/*'],
     commands: {
       'toggle-radio': {
-        description: 'Toggle Radio',
+        description: 'Play / pause',
       },
       'display-now-playing': {
-        description: 'Display Now Playing',
+        description: 'Show current song',
       },
       'lower-volume': {
-        description: 'Lower Radio Volume',
+        description: 'Volume down',
       },
       'raise-volume': {
-        description: 'Raise Radio Volume',
+        description: 'Volume up',
       },
     },
   }),

@@ -14,7 +14,7 @@
   src: url('./fonts/IBMPlexMono-Bold.woff2') format('woff2');
 }
 
-@variant dark (&:is(.dark *));
+@variant dark (&:where(.dark, .dark *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .amoled, .amoled *, .everforest, .everforest *, .city-lights, .city-lights *));
 
 @theme {
   --font-mono: 'IBM Plex Mono', monospace;
@@ -36,24 +36,171 @@
   50% { opacity: 0.4; }
 }
 
-@keyframes eq-a {
-  0%, 100% { transform: scaleY(0.4); }
-  50% { transform: scaleY(1); }
-}
-
-@keyframes eq-b {
-  0%, 100% { transform: scaleY(0.6); }
-  50% { transform: scaleY(0.3); }
-}
-
-@keyframes eq-c {
-  0%, 100% { transform: scaleY(0.8); }
-  50% { transform: scaleY(0.5); }
-}
-
 * {
   font-family: 'IBM Plex Mono', monospace;
 }
+
+:root,
+.light {
+  --dk-bg: #fafafa;
+  --dk-surface: #ffffff;
+  --dk-border: #e4e4e4;
+  --dk-heading: #0f0f0f;
+  --dk-body: #3a3a3a;
+  --dk-muted: #999999;
+  --dk-accent: var(--dk-heading);
+  --dk-accent-alt: var(--dk-muted);
+}
+
+.dark {
+  --dk-bg: #131313;
+  --dk-surface: #1c1c1c;
+  --dk-border: #282828;
+  --dk-heading: #efefef;
+  --dk-body: #ababab;
+  --dk-muted: #5a5a5a;
+  --dk-accent: var(--dk-heading);
+  --dk-accent-alt: var(--dk-muted);
+}
+
+.city-lights {
+  --dk-bg: #1d252c;
+  --dk-surface: #232c35;
+  --dk-border: #333f4a;
+  --dk-heading: #ffffff;
+  --dk-body: #b7c5d3;
+  --dk-muted: #718ca1;
+  --dk-accent: #5ec4ff;
+  --dk-accent-alt: #70e1e8;
+}
+
+.nord {
+  --dk-bg: #2e3440;
+  --dk-surface: #3b4252;
+  --dk-border: #434c5e;
+  --dk-heading: #eceff4;
+  --dk-body: #d8dee9;
+  --dk-muted: #7b88a1;
+  --dk-accent: #88c0d0;
+  --dk-accent-alt: #a3be8c;
+}
+
+.dracula {
+  --dk-bg: #282a36;
+  --dk-surface: #2f3140;
+  --dk-border: #44475a;
+  --dk-heading: #f8f8f2;
+  --dk-body: #f8f8f2;
+  --dk-muted: #6272a4;
+  --dk-accent: #ff79c6;
+  --dk-accent-alt: #50fa7b;
+}
+
+.catppuccin {
+  --dk-bg: #1e1e2e;
+  --dk-surface: #313244;
+  --dk-border: #45475a;
+  --dk-heading: #cdd6f4;
+  --dk-body: #a6adc8;
+  --dk-muted: #6c7086;
+  --dk-accent: #cba6f7;
+  --dk-accent-alt: #a6e3a1;
+}
+
+.gruvbox {
+  --dk-bg: #282828;
+  --dk-surface: #3c3836;
+  --dk-border: #504945;
+  --dk-heading: #ebdbb2;
+  --dk-body: #d5c4a1;
+  --dk-muted: #928374;
+  --dk-accent: #fe8019;
+  --dk-accent-alt: #b8bb26;
+}
+
+.everforest {
+  --dk-bg: #2d353b;
+  --dk-surface: #323c40;
+  --dk-border: #475258;
+  --dk-heading: #d3c6aa;
+  --dk-body: #9da9a0;
+  --dk-muted: #859289;
+  --dk-accent: #e69875;
+  --dk-accent-alt: #a7c080;
+}
+
+.amoled {
+  --dk-bg: #000000;
+  --dk-surface: #0a0a0a;
+  --dk-border: #3a3a3a;
+  --dk-heading: #ffffff;
+  --dk-body: #cccccc;
+  --dk-muted: #555555;
+  --dk-accent: #ffffff;
+  --dk-accent-alt: #888888;
+}
+
+@utility tk-bg {
+  background-color: var(--dk-bg);
+}
+@utility tk-surface {
+  background-color: var(--dk-surface);
+}
+@utility tk-border {
+  border-color: var(--dk-border);
+}
+@utility tk-heading {
+  color: var(--dk-heading);
+}
+@utility tk-body {
+  color: var(--dk-body);
+}
+@utility tk-muted {
+  color: var(--dk-muted);
+}
+@utility tk-accent {
+  color: var(--dk-accent);
+}
+@utility tk-accent-alt {
+  color: var(--dk-accent-alt);
+}
+@utility tk-bg-accent {
+  background-color: var(--dk-accent);
+}
+
+/* All non-light theme classes get dark color-scheme. */
+.dark, .amoled, .nord, .dracula, .catppuccin, .gruvbox, .everforest, .city-lights {
+  color-scheme: dark;
+}
+
+/* Existing components use Tailwind utilities like `dark:bg-gray-950` and
+   `dark:bg-[#1a1a1a]`. These compile to selectors targeting class names
+   like `:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:bg-gray-950` (literal `dark:` in the class name) and trigger
+   under any theme via the @variant dark above. To re-skin them per theme,
+   override the compiled utility classes with theme-specific values. */
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:bg-gray-950 { background-color: var(--dk-bg) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:bg-gray-900 { background-color: var(--dk-surface) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:bg-gray-800 { background-color: var(--dk-surface) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:bg-\[\#1a1a1a\] { background-color: var(--dk-surface) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:bg-\[\#2a2a2a\] { background-color: var(--dk-border) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:bg-\[\#6e6e6e\] { background-color: var(--dk-muted) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:bg-\[\#f0f0f0\] { background-color: var(--dk-heading) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:border-\[\#2a2a2a\] { border-color: var(--dk-border) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:border-\[\#3a3a3a\] { border-color: var(--dk-border) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:border-\[\#f0f0f0\] { border-color: var(--dk-heading) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:text-\[\#f0f0f0\] { color: var(--dk-heading) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:text-\[\#b0b0b0\] { color: var(--dk-body) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:text-\[\#6e6e6e\] { color: var(--dk-muted) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:text-\[\#3a3a3a\] { color: var(--dk-muted) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:text-gray-50 { color: var(--dk-heading) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:text-gray-100 { color: var(--dk-body) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:text-gray-600 { color: var(--dk-muted) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:hover\:bg-\[\#2a2a2a\]:hover { background-color: var(--dk-border) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:hover\:text-\[\#f0f0f0\]:hover { color: var(--dk-heading) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:hover\:text-\[\#b0b0b0\]:hover { color: var(--dk-body) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:hover\:text-gray-50:hover { color: var(--dk-heading) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:hover\:border-\[\#6e6e6e\]:hover { border-color: var(--dk-muted) !important; }
+:is(.dark, .dark *, .amoled, .amoled *, .nord, .nord *, .dracula, .dracula *, .catppuccin, .catppuccin *, .gruvbox, .gruvbox *, .everforest, .everforest *, .city-lights, .city-lights *).dark\:ring-\[\#3a3a3a\] { --tw-ring-color: var(--dk-border) !important; }
 
 
 ::-webkit-scrollbar {
