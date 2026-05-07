@@ -5,6 +5,10 @@ export default defineConfig({
   srcDir: 'src',
   extensionApi: 'webextension-polyfill',
   modules: ['@wxt-dev/module-react'],
+  zip: {
+    excludeSources: ['screenshots/**', 'docs/**', '.output/**', '.wxt/**'],
+    includeSources: ['.env'],
+  },
   vite: () => ({
     plugins: [tailwindcss()],
   }),
@@ -12,7 +16,6 @@ export default defineConfig({
     name: 'jawr - just another web radio',
     short_name: 'jawr',
     description: 'discover new music on a curated 24/7 web radio',
-    version: '1.0',
     icons: {
       16: 'icons/16.png',
       32: 'icons/32.png',
@@ -23,7 +26,16 @@ export default defineConfig({
     permissions: browser === 'chrome'
       ? ['offscreen', 'notifications', 'storage']
       : ['notifications', 'storage'],
-    host_permissions: ['https://jawr.org/*'],
+    host_permissions: [
+      'https://jawr.org/*',
+      'https://api.jawr.org/*',
+    ],
+    browser_specific_settings: {
+      gecko: {
+        id: 'jawr@jawr.org',
+        data_collection_permissions: { required: ['none'] },
+      },
+    },
     commands: {
       'toggle-radio': {
         description: 'Play / pause',
