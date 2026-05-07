@@ -9,18 +9,13 @@ const DEFAULT_STATE: ExtensionState = {
   song: null,
   history: [],
   volume: { value: 0.5, isMuted: false },
-  lastfmSession: null,
-  lastfmPending: false,
 };
 
 type PopupOut =
   | { type: 'PLAY' }
   | { type: 'PAUSE' }
   | { type: 'TOGGLE_MUTE' }
-  | { type: 'SET_VOLUME'; payload: number }
-  | { type: 'LASTFM_CONNECT' }
-  | { type: 'LASTFM_CONFIRM' }
-  | { type: 'LASTFM_DISCONNECT' };
+  | { type: 'SET_VOLUME'; payload: number };
 
 function toBg(msg: PopupOut) {
   browser.runtime.sendMessage({ target: 'background', ...msg } satisfies ExtensionMessage).catch(() => {});
@@ -103,18 +98,6 @@ function handleToggleCompactMode() {
     saveLocale(l);
   }
 
-  function handleLastfmConnect() {
-    toBg({ type: 'LASTFM_CONNECT' });
-  }
-
-  function handleLastfmConfirm() {
-    toBg({ type: 'LASTFM_CONFIRM' });
-  }
-
-  function handleLastfmDisconnect() {
-    toBg({ type: 'LASTFM_DISCONNECT' });
-  }
-
   return (
     <RadioPlayer
       state={state}
@@ -132,11 +115,6 @@ function handleToggleCompactMode() {
       onPause={() => toBg({ type: 'PAUSE' })}
       onToggleMute={() => toBg({ type: 'TOGGLE_MUTE' })}
       onSetVolume={(v) => toBg({ type: 'SET_VOLUME', payload: v })}
-      lastfmSession={state.lastfmSession}
-      lastfmPending={state.lastfmPending}
-      onLastfmConnect={handleLastfmConnect}
-      onLastfmConfirm={handleLastfmConfirm}
-      onLastfmDisconnect={handleLastfmDisconnect}
     />
   );
 }

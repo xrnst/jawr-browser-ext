@@ -1,5 +1,3 @@
-import type { LastfmSession } from '../utils/lastfm';
-
 export type Song = {
   artist?: string;
   title?: string;
@@ -21,8 +19,6 @@ export type ExtensionState = {
   song: Song | null;
   history: HistoryItem[];
   volume: VolumeState;
-  lastfmSession: LastfmSession | null;
-  lastfmPending: boolean;
 };
 
 export type MessageTarget = 'background' | 'popup' | 'offscreen';
@@ -46,7 +42,4 @@ export type ExtensionMessage =
   | { target: 'background'; type: 'OFFSCREEN_MEDIA_PAUSE' }
   | { target: 'popup'; type: 'FFT_DATA'; payload: number[] }
   | { target: 'background'; type: 'FFT_START'; payload: number }
-  | { target: 'background'; type: 'FFT_STOP' }
-  | { target: 'background'; type: 'LASTFM_CONNECT' }
-  | { target: 'background'; type: 'LASTFM_CONFIRM' }
-  | { target: 'background'; type: 'LASTFM_DISCONNECT' };
+  | { target: 'background'; type: 'FFT_STOP' };
