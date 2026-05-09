@@ -5,6 +5,9 @@ export type NowPlayingUpdate = {
   history: HistoryItem[];
 };
 
+const IS_CHROME = import.meta.env.BROWSER === 'chrome';
+const ALARM_NAME = 'jawr-ws-reconnect';
+
 export function createWebSocketManager(
   wsUrl: string,
   onUpdate: (update: NowPlayingUpdate) => void,
@@ -12,7 +15,27 @@ export function createWebSocketManager(
   let ws: WebSocket | null = null;
   let reconnectDelay = 1000;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let alarmListener: ((alarm: chrome.alarms.Alarm) => void) | null = null;
   let destroyed = false;
+
+  function scheduleReconnect() {
+    if (destroyed) return;
+    const delayMs = reconnectDelay;
+    reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+    if (IS_CHROME) {
+      // chrome.alarms minimum is 30s; clamp up
+      const delayInMinutes = Math.max(0.5, delayMs / 60000);
+      chrome.alarms.create(ALARM_NAME, { delayInMinutes });
+      if (!alarmListener) {
+        alarmListener = (alarm) => {
+          if (alarm.name === ALARM_NAME) connect();
+        };
+        chrome.alarms.onAlarm.addListener(alarmListener);
+      }
+    } else {
+      reconnectTimer = setTimeout(connect, delayMs);
+    }
+  }
 
   function parseMessage(raw: string) {
     try {
@@ -60,10 +83,7 @@ export function createWebSocketManager(
 
     socket.onclose = () => {
       if (destroyed) return;
-      reconnectTimer = setTimeout(() => {
-        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
-        connect();
-      }, reconnectDelay);
+      scheduleReconnect();
     };
 
     socket.onerror = () => {
@@ -77,6 +97,10 @@ export function createWebSocketManager(
     destroy() {
       destroyed = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (IS_CHROME) {
+        chrome.alarms.clear(ALARM_NAME);
+        if (alarmListener) chrome.alarms.onAlarm.removeListener(alarmListener);
+      }
       ws?.close();
     },
   };

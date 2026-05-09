@@ -9,11 +9,13 @@ import { createWebSocketManager } from '../utils/websocket';
 const STREAM_URL = `${import.meta.env.VITE_AZURACAST_URL}/listen/jawr/radio.mp3`;
 const WS_URL = `${import.meta.env.VITE_AZURACAST_URL_WS}/api/live/nowplaying/websocket`;
 
+const DEFAULT_VOLUME: VolumeState = { value: 0.5, isMuted: false };
+
 let state: ExtensionState = {
   playing: false,
   song: null,
   history: [],
-  volume: loadVolume(),
+  volume: DEFAULT_VOLUME,
 };
 
 function broadcastToPopup(msg: ExtensionMessage) {
@@ -217,6 +219,11 @@ function showNowPlayingNotification() {
 }
 
 export default defineBackground(() => {
+  loadVolume().then((volume) => {
+    state = { ...state, volume };
+    applyVolume(volume);
+  });
+
   createWebSocketManager(WS_URL, handleNowPlayingUpdate);
 
   fetchNowPlaying().then(({ song, history }) => {
@@ -298,6 +305,4 @@ export default defineBackground(() => {
     }
     return false;
   });
-
-  applyVolume(state.volume);
 });

@@ -24,7 +24,7 @@ export default defineConfig({
       128: 'icons/128.png',
     },
     permissions: browser === 'chrome'
-      ? ['offscreen', 'notifications', 'storage']
+      ? ['offscreen', 'notifications', 'storage', 'alarms']
       : ['notifications', 'storage'],
     host_permissions: [
       'https://jawr.org/*',

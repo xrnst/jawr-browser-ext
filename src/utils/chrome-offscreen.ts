@@ -11,13 +11,21 @@ async function hasOffscreenDocument(): Promise<boolean> {
   return contexts.length > 0;
 }
 
+let creating: Promise<void> | null = null;
+
 export async function ensureOffscreen(): Promise<void> {
   if (await hasOffscreenDocument()) return;
-  await chrome.offscreen.createDocument({
-    url: OFFSCREEN_URL,
-    reasons: [chrome.offscreen.Reason.AUDIO_PLAYBACK],
-    justification: 'Radio audio playback',
-  });
+  if (creating) return creating;
+  creating = chrome.offscreen
+    .createDocument({
+      url: OFFSCREEN_URL,
+      reasons: [chrome.offscreen.Reason.AUDIO_PLAYBACK],
+      justification: 'Radio audio playback',
+    })
+    .finally(() => {
+      creating = null;
+    });
+  await creating;
 }
 
 export async function sendToOffscreen(msg: ExtensionMessage): Promise<void> {

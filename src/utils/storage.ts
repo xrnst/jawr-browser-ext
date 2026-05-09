@@ -5,22 +5,19 @@ const THEME_KEY = 'jawr_theme';
 
 const DEFAULT_VOLUME: VolumeState = { value: 0.5, isMuted: false };
 
-export function loadVolume(): VolumeState {
+export async function loadVolume(): Promise<VolumeState> {
   try {
-    const raw = localStorage.getItem(VOLUME_KEY);
-    if (!raw) return DEFAULT_VOLUME;
-    return JSON.parse(raw) as VolumeState;
-  } catch {
-    return DEFAULT_VOLUME;
-  }
+    const result = await browser.storage.local.get(VOLUME_KEY);
+    const raw = result[VOLUME_KEY];
+    if (raw && typeof raw === 'object') return raw as VolumeState;
+  } catch {}
+  return DEFAULT_VOLUME;
 }
 
-export function saveVolume(state: VolumeState): void {
+export async function saveVolume(state: VolumeState): Promise<void> {
   try {
-    localStorage.setItem(VOLUME_KEY, JSON.stringify(state));
-  } catch {
-    // storage unavailable — ignore
-  }
+    await browser.storage.local.set({ [VOLUME_KEY]: state });
+  } catch {}
 }
 
 export type Theme =
