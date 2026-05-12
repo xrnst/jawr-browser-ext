@@ -19,8 +19,8 @@ Browser extension for [jawr.org](https://jawr.org) - a 24/7 curated web radio.
 
 ## Install
 
-- Chrome / Edge: [Web Store](#) (coming soon)
-- Firefox: [AMO](#) (coming soon)
+- Chrome / Edge: [Web Store](https://chromewebstore.google.com/detail/jawr-just-another-web-rad/iojdmpebpopkfdcpdipaonhlcfkkdbck)
+- Firefox: [AMO](https://addons.mozilla.org/pt-BR/firefox/addon/jawr-just-another-web-radio/)
 
 ## Development
 
