@@ -12,7 +12,7 @@ Browser extension for [jawr.org](https://jawr.org) - a 24/7 curated web radio.
 - One-click play/pause, volume, mute
 - Now-playing with cover art and history
 - Live FFT visualization
-- Track-change notifications (opt-in)
+- Track-change notifications (on by default, toggle in settings)
 - Keyboard shortcuts
 - 9 themes, English + Portuguese
 - Mini player mode

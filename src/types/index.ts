@@ -14,14 +14,18 @@ export type VolumeState = {
   isMuted: boolean;
 };
 
-export type ExtensionState = {
+export type StreamStatus = {
   playing: boolean;
+  reconnecting: boolean;
+  streamError: boolean;
+};
+
+export type ExtensionState = StreamStatus & {
   song: Song | null;
+  nextSong: Song | null;
   history: HistoryItem[];
   volume: VolumeState;
 };
-
-export type MessageTarget = 'background' | 'popup' | 'offscreen';
 
 export type ExtensionMessage =
   | { target: 'background'; type: 'PLAY' }
@@ -29,7 +33,7 @@ export type ExtensionMessage =
   | { target: 'background'; type: 'TOGGLE_MUTE' }
   | { target: 'background'; type: 'SET_VOLUME'; payload: number }
   | { target: 'background'; type: 'GET_STATE' }
-  | { target: 'background'; type: 'OFFSCREEN_ERROR' }
+  | { target: 'background'; type: 'OFFSCREEN_STATUS'; payload: StreamStatus }
   | { target: 'popup'; type: 'STATE_UPDATE'; payload: ExtensionState }
   | { target: 'offscreen'; type: 'OFFSCREEN_PLAY'; payload: string }
   | { target: 'offscreen'; type: 'OFFSCREEN_PAUSE' }
@@ -38,6 +42,7 @@ export type ExtensionMessage =
   | { target: 'offscreen'; type: 'OFFSCREEN_FFT_START'; payload: number }
   | { target: 'offscreen'; type: 'OFFSCREEN_FFT_STOP' }
   | { target: 'offscreen'; type: 'OFFSCREEN_METADATA'; payload: Song | null }
+  | { target: 'offscreen'; type: 'OFFSCREEN_GET_STATUS' }
   | { target: 'background'; type: 'OFFSCREEN_MEDIA_PLAY' }
   | { target: 'background'; type: 'OFFSCREEN_MEDIA_PAUSE' }
   | { target: 'popup'; type: 'FFT_DATA'; payload: number[] }

@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { RadioPlayer } from '../../components/RadioPlayer';
 import type { ExtensionMessage, ExtensionState } from '../../types';
-import { loadTheme, saveTheme, loadNotifications, saveNotifications, loadCompactMode, saveCompactMode, THEMES, type Theme } from '../../utils/storage';
+import { DEFAULT_VOLUME, loadTheme, saveTheme, loadNotifications, saveNotifications, loadCompactMode, saveCompactMode, THEMES, type Theme } from '../../utils/storage';
 import { loadLocale, saveLocale, getTranslations, type Locale } from '../../i18n';
 
 const DEFAULT_STATE: ExtensionState = {
   playing: false,
+  reconnecting: false,
+  streamError: false,
   song: null,
+  nextSong: null,
   history: [],
-  volume: { value: 0.5, isMuted: false },
+  volume: DEFAULT_VOLUME,
 };
 
 type PopupOut =
@@ -21,21 +24,24 @@ function toBg(msg: PopupOut) {
   browser.runtime.sendMessage({ target: 'background', ...msg } satisfies ExtensionMessage).catch(() => {});
 }
 
-const FFT_BARS = 5;
-
 export default function App() {
   const [state, setState] = useState<ExtensionState>(DEFAULT_STATE);
   const [theme, setTheme] = useState<Theme>(loadTheme);
   const [notifications, setNotifications] = useState(true);
   const [compactMode, setCompactMode] = useState(false);
   const [locale, setLocale] = useState<Locale>(loadLocale);
-  const [fft, setFft] = useState<number[]>(() => new Array(FFT_BARS).fill(0));
   const isMounted = useRef(false);
 
   useEffect(() => {
     loadNotifications().then(setNotifications);
     loadCompactMode().then(setCompactMode);
+    const port = browser.runtime.connect({ name: 'popup' });
+    return () => port.disconnect();
   }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = locale === 'pt' ? 'pt-BR' : 'en';
+  }, [locale]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -55,31 +61,11 @@ export default function App() {
 
     const listener = (rawMessage: unknown) => {
       const message = rawMessage as ExtensionMessage;
-      if (message.target !== 'popup') return;
-      if (message.type === 'STATE_UPDATE') {
-        setState(message.payload);
-      } else if (message.type === 'FFT_DATA') {
-        setFft(message.payload);
-      }
+      if (message.target === 'popup' && message.type === 'STATE_UPDATE') setState(message.payload);
     };
     browser.runtime.onMessage.addListener(listener);
     return () => browser.runtime.onMessage.removeListener(listener);
   }, []);
-
-  useEffect(() => {
-    if (!state.playing) {
-      setFft(new Array(FFT_BARS).fill(0));
-      return;
-    }
-    browser.runtime
-      .sendMessage({ target: 'background', type: 'FFT_START', payload: FFT_BARS } satisfies ExtensionMessage)
-      .catch(() => {});
-    return () => {
-      browser.runtime
-        .sendMessage({ target: 'background', type: 'FFT_STOP' } satisfies ExtensionMessage)
-        .catch(() => {});
-    };
-  }, [state.playing]);
 
   function handleToggleNotifications() {
     const next = !notifications;
@@ -101,7 +87,6 @@ function handleToggleCompactMode() {
   return (
     <RadioPlayer
       state={state}
-      fft={fft}
       theme={theme}
       notifications={notifications}
       locale={locale}

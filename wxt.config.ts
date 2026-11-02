@@ -33,7 +33,10 @@ export default defineConfig({
     browser_specific_settings: {
       gecko: {
         id: 'jawr@jawr.org',
-        data_collection_permissions: { required: ['none'] },
+        data_collection_permissions: {
+          required: ['none'],
+          optional: ['personallyIdentifyingInfo', 'personalCommunications'],
+        },
       },
     },
     commands: {
@@ -48,6 +51,9 @@ export default defineConfig({
       },
       'raise-volume': {
         description: 'Volume up',
+      },
+      'toggle-mute': {
+        description: 'Mute / unmute',
       },
     },
   }),

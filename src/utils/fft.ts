@@ -1,5 +1,5 @@
 export const FFT_SIZE = 1024;
-export const FFT_SMOOTHING = 0.75;
+export const FFT_SMOOTHING = 0.8;
 export const STREAM_INTERVAL_MS = 1000 / 60;
 
 const MIN_HZ = 40;

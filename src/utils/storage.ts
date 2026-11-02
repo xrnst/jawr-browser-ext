@@ -3,15 +3,27 @@ import type { VolumeState } from '../types';
 const VOLUME_KEY = 'jawr_volume';
 const THEME_KEY = 'jawr_theme';
 
-const DEFAULT_VOLUME: VolumeState = { value: 0.5, isMuted: false };
+export const DEFAULT_VOLUME: VolumeState = { value: 0.5, isMuted: false };
 
 export async function loadVolume(): Promise<VolumeState> {
   try {
     const result = await browser.storage.local.get(VOLUME_KEY);
-    const raw = result[VOLUME_KEY];
-    if (raw && typeof raw === 'object') return raw as VolumeState;
+    return parseVolume(result[VOLUME_KEY]);
   } catch {}
   return DEFAULT_VOLUME;
+}
+
+export function clampVolume(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+export function parseVolume(raw: unknown): VolumeState {
+  if (typeof raw !== 'object' || raw === null) return DEFAULT_VOLUME;
+  const { value, isMuted } = raw as Record<string, unknown>;
+  return {
+    value: typeof value === 'number' && Number.isFinite(value) ? clampVolume(value) : DEFAULT_VOLUME.value,
+    isMuted: Boolean(isMuted),
+  };
 }
 
 export async function saveVolume(state: VolumeState): Promise<void> {

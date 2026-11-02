@@ -1,6 +1,6 @@
 {
   "name": "jawr-browser-ext",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -10,7 +10,9 @@
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
-    "zip:firefox": "wxt zip -b firefox"
+    "zip:firefox": "wxt zip -b firefox",
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "typecheck": "wxt prepare && tsc --noEmit"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

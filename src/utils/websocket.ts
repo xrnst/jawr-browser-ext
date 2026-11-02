@@ -1,25 +1,17 @@
-import type { HistoryItem, Song } from '../types';
-
-export type NowPlayingUpdate = {
-  song: Song | null;
-  history: HistoryItem[];
-};
+import { readNowPlayingFrame, type NowPlayingUpdate } from './now-playing';
 
 const IS_CHROME = import.meta.env.BROWSER === 'chrome';
 const ALARM_NAME = 'jawr-ws-reconnect';
+const CHANNEL = 'station:jawr';
 
 export function createWebSocketManager(
   wsUrl: string,
   onUpdate: (update: NowPlayingUpdate) => void,
-): { destroy: () => void } {
-  let ws: WebSocket | null = null;
+): void {
   let reconnectDelay = 1000;
-  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let alarmListener: ((alarm: chrome.alarms.Alarm) => void) | null = null;
-  let destroyed = false;
 
   function scheduleReconnect() {
-    if (destroyed) return;
     const delayMs = reconnectDelay;
     reconnectDelay = Math.min(reconnectDelay * 2, 30000);
     if (IS_CHROME) {
@@ -33,58 +25,23 @@ export function createWebSocketManager(
         chrome.alarms.onAlarm.addListener(alarmListener);
       }
     } else {
-      reconnectTimer = setTimeout(connect, delayMs);
-    }
-  }
-
-  function parseMessage(raw: string) {
-    try {
-      const msg = JSON.parse(raw);
-
-      if (msg.connect?.data) {
-        for (const item of msg.connect.data) {
-          if (item.channel === 'station:jawr' && item.data?.np) {
-            const np = item.data.np;
-            onUpdate({
-              song: np.now_playing?.song ?? null,
-              history: np.song_history ?? [],
-            });
-          }
-        }
-        return;
-      }
-
-      if (msg.channel === 'station:jawr' && msg.pub?.data?.np) {
-        const np = msg.pub.data.np;
-        onUpdate({
-          song: np.now_playing?.song ?? null,
-          history: np.song_history ?? [],
-        });
-      }
-    } catch {
-      // malformed message — ignore
+      setTimeout(connect, delayMs);
     }
   }
 
   function connect() {
-    if (destroyed) return;
-
     const socket = new WebSocket(wsUrl);
-    ws = socket;
 
     socket.onopen = () => {
       reconnectDelay = 1000;
-      socket.send(JSON.stringify({ subs: { 'station:jawr': {} } }));
+      socket.send(JSON.stringify({ subs: { [CHANNEL]: { recover: true } } }));
     };
 
     socket.onmessage = (event) => {
-      parseMessage(event.data as string);
+      readNowPlayingFrame(event.data as string, CHANNEL).forEach(onUpdate);
     };
 
-    socket.onclose = () => {
-      if (destroyed) return;
-      scheduleReconnect();
-    };
+    socket.onclose = scheduleReconnect;
 
     socket.onerror = () => {
       socket.close();
@@ -92,16 +49,4 @@ export function createWebSocketManager(
   }
 
   connect();
-
-  return {
-    destroy() {
-      destroyed = true;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (IS_CHROME) {
-        chrome.alarms.clear(ALARM_NAME);
-        if (alarmListener) chrome.alarms.onAlarm.removeListener(alarmListener);
-      }
-      ws?.close();
-    },
-  };
 }

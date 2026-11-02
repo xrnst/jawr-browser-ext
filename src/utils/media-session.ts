@@ -1,5 +1,8 @@
 import type { Song } from '../types';
 
+const ARTWORK_SIZES = ['96x96', '192x192', '512x512'] as const;
+const ALBUM_NAME = 'jawr.';
+
 type MediaActionHandlers = {
   onPlay: () => void;
   onPause: () => void;
@@ -10,15 +13,12 @@ function hasMediaSession(): boolean {
 }
 
 export function setMediaMetadata(song: Song | null): void {
-  if (!hasMediaSession()) return;
-  if (!song) {
-    navigator.mediaSession.metadata = null;
-    return;
-  }
+  if (!hasMediaSession() || !song) return;
   navigator.mediaSession.metadata = new MediaMetadata({
     title: song.title ?? '',
     artist: song.artist ?? '',
-    artwork: song.art ? [{ src: song.art, sizes: '512x512', type: 'image/jpeg' }] : [],
+    album: ALBUM_NAME,
+    artwork: song.art ? ARTWORK_SIZES.map((sizes) => ({ src: song.art as string, sizes, type: 'image/jpeg' })) : [],
   });
 }
 

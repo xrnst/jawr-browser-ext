@@ -1,24 +1,27 @@
-import type { ExtensionMessage } from '../../types';
+import type { ExtensionMessage, StreamStatus } from '../../types';
 import { computeFrequencyBands, FFT_SIZE, FFT_SMOOTHING, STREAM_INTERVAL_MS } from '../../utils/fft';
 import { registerMediaActions, setMediaMetadata, setMediaPlaybackState } from '../../utils/media-session';
-import { createReconnector } from '../../utils/reconnect';
+import { createStreamPlayer } from '../../utils/stream-player';
 
 const audio = new Audio();
 audio.preload = 'none';
 audio.crossOrigin = 'anonymous';
 
-let currentSrc = '';
+let player: ReturnType<typeof createStreamPlayer> | null = null;
+let lastStatus: StreamStatus = { playing: false, reconnecting: false, streamError: false };
 
-const reconnector = createReconnector(() => {
-  if (!currentSrc) return Promise.reject();
-  audio.src = currentSrc;
-  audio.load();
-  return audio.play();
-});
-
-audio.addEventListener('error', reconnector.schedule);
-audio.addEventListener('stalled', reconnector.schedule);
-audio.addEventListener('ended', reconnector.schedule);
+function ensurePlayer(src: string) {
+  if (player) return player;
+  player = createStreamPlayer(audio, src, (status) => {
+    lastStatus = status;
+    setMediaPlaybackState(status.playing ? 'playing' : 'paused');
+    if (!status.playing) stopStream();
+    chrome.runtime
+      .sendMessage({ target: 'background', type: 'OFFSCREEN_STATUS', payload: status } satisfies ExtensionMessage)
+      .catch(() => {});
+  });
+  return player;
+}
 
 function notifyBackground(type: 'OFFSCREEN_MEDIA_PLAY' | 'OFFSCREEN_MEDIA_PAUSE') {
   chrome.runtime
@@ -75,6 +78,7 @@ function startStream(bars: number) {
 }
 
 function stopStream() {
+  pendingStart = false;
   if (intervalId !== null) {
     clearInterval(intervalId);
     intervalId = null;
@@ -88,33 +92,22 @@ audio.addEventListener('playing', () => {
 });
 
 function play(src: string) {
-  reconnector.arm();
-  currentSrc = src;
-  audio.src = src;
-  audio.load();
-  audio.play()
-    .then(() => ensureAnalyser())
-    .catch(() => {
-      chrome.runtime
-        .sendMessage({ target: 'background', type: 'OFFSCREEN_ERROR' } satisfies ExtensionMessage)
-        .catch(() => {});
-    });
-  setMediaPlaybackState('playing');
+  ensurePlayer(src)
+    .play()
+    .then((started) => started && ensureAnalyser());
 }
 
 function pause() {
-  reconnector.cancel();
-  pendingStart = false;
   stopStream();
-  audio.pause();
-  audio.src = '';
-  currentSrc = '';
-  setMediaPlaybackState('paused');
+  player?.pause();
 }
 
-chrome.runtime.onMessage.addListener((message: ExtensionMessage) => {
+chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
   if (message.target !== 'offscreen') return false;
   switch (message.type) {
+    case 'OFFSCREEN_GET_STATUS':
+      sendResponse(lastStatus);
+      break;
     case 'OFFSCREEN_PLAY':
       play(message.payload);
       break;

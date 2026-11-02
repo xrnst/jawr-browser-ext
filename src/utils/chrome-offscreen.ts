@@ -1,4 +1,4 @@
-import type { ExtensionMessage } from '../types';
+import type { ExtensionMessage, StreamStatus } from '../types';
 
 const OFFSCREEN_URL = 'offscreen.html';
 
@@ -31,4 +31,12 @@ export async function ensureOffscreen(): Promise<void> {
 export async function sendToOffscreen(msg: ExtensionMessage): Promise<void> {
   if (!(await hasOffscreenDocument())) return;
   chrome.runtime.sendMessage(msg).catch(() => {});
+}
+
+export async function getOffscreenStatus(): Promise<StreamStatus | null> {
+  if (!(await hasOffscreenDocument())) return null;
+  const status: unknown = await chrome.runtime
+    .sendMessage({ target: 'offscreen', type: 'OFFSCREEN_GET_STATUS' } satisfies ExtensionMessage)
+    .catch(() => null);
+  return typeof status === 'object' && status !== null ? (status as StreamStatus) : null;
 }

@@ -2,18 +2,21 @@ import type { ExtensionMessage, ExtensionState, Song, VolumeState } from '../typ
 import { fetchNowPlaying } from '../utils/api';
 import { computeFrequencyBands, FFT_SIZE, FFT_SMOOTHING, STREAM_INTERVAL_MS } from '../utils/fft';
 import { registerMediaActions, setMediaMetadata, setMediaPlaybackState } from '../utils/media-session';
-import { createReconnector } from '../utils/reconnect';
-import { loadNotifications, loadVolume, saveVolume } from '../utils/storage';
+import type { NowPlayingUpdate } from '../utils/now-playing';
+import { formatSongTitle } from '../utils/song';
+import { clampVolume, DEFAULT_VOLUME, loadNotifications, loadVolume, saveVolume } from '../utils/storage';
+import { createStreamPlayer } from '../utils/stream-player';
 import { createWebSocketManager } from '../utils/websocket';
 
 const STREAM_URL = `${import.meta.env.VITE_AZURACAST_URL}/listen/jawr/radio.mp3`;
 const WS_URL = `${import.meta.env.VITE_AZURACAST_URL_WS}/api/live/nowplaying/websocket`;
 
-const DEFAULT_VOLUME: VolumeState = { value: 0.5, isMuted: false };
-
 let state: ExtensionState = {
   playing: false,
+  reconnecting: false,
+  streamError: false,
   song: null,
+  nextSong: null,
   history: [],
   volume: DEFAULT_VOLUME,
 };
@@ -84,46 +87,40 @@ function firefoxStopFft() {
   }
 }
 
-const firefoxReconnector = createReconnector(() => {
-  if (!firefoxAudio) return Promise.reject();
-  firefoxAudio.src = STREAM_URL;
-  return firefoxAudio.play();
-});
+let firefoxPlayer: ReturnType<typeof createStreamPlayer> | null = null;
 
-function firefoxEnsureAudioElement(): HTMLAudioElement {
-  if (firefoxAudio) return firefoxAudio;
+function firefoxEnsurePlayer() {
+  if (firefoxPlayer) return firefoxPlayer;
   const el = new Audio();
   el.preload = 'none';
   el.crossOrigin = 'anonymous';
-  el.addEventListener('error', firefoxReconnector.schedule);
-  el.addEventListener('stalled', firefoxReconnector.schedule);
-  el.addEventListener('ended', firefoxReconnector.schedule);
-  registerMediaActions({ onPlay: () => play(), onPause: () => pause() });
+  firefoxPlayer = createStreamPlayer(el, STREAM_URL, (status) => {
+    setMediaPlaybackState(status.playing ? 'playing' : 'paused');
+    if (!status.playing) firefoxStopFft();
+    setState(status);
+  });
+  registerMediaActions({
+    onPlay: () => {
+      if (!state.playing) play();
+    },
+    onPause: () => {
+      if (state.playing) pause();
+    },
+  });
   firefoxAudio = el;
-  return el;
+  return firefoxPlayer;
 }
 
 function firefoxPlay() {
-  firefoxReconnector.arm();
-  const el = firefoxEnsureAudioElement();
-  el.volume = state.volume.value;
-  el.muted = state.volume.isMuted;
-  el.src = STREAM_URL;
-  el.play()
-    .then(() => firefoxEnsureAnalyser())
-    .catch(() => setState({ playing: false }));
-  setMediaPlaybackState('playing');
+  const player = firefoxEnsurePlayer();
+  firefoxApplyVolume(state.volume);
   setMediaMetadata(state.song);
-  setState({ playing: true });
+  player.play().then((started) => started && firefoxEnsureAnalyser());
 }
 
 function firefoxPause() {
-  firefoxReconnector.cancel();
   firefoxStopFft();
-  firefoxAudio?.pause();
-  if (firefoxAudio) firefoxAudio.src = '';
-  setMediaPlaybackState('paused');
-  setState({ playing: false });
+  firefoxPlayer?.pause();
 }
 
 function firefoxApplyVolume(volume: VolumeState) {
@@ -151,14 +148,14 @@ async function chromeSendToOffscreen(msg: ExtensionMessage) {
 async function chromePlay() {
   const m = await getChromeOffscreen();
   await m.ensureOffscreen();
+  await chromeSendVolume(state.volume);
   await m.sendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_PLAY', payload: STREAM_URL });
   await m.sendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_METADATA', payload: state.song });
-  setState({ playing: true });
 }
 
 async function chromePause() {
   await chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_PAUSE' });
-  setState({ playing: false });
+  setState({ playing: false, reconnecting: false });
 }
 
 async function chromeSendVolume(volume: VolumeState) {
@@ -183,126 +180,152 @@ function applyVolume(volume: VolumeState) {
   else chromeSendVolume(volume);
 }
 
+function stopFft() {
+  if (isFirefox()) firefoxStopFft();
+  else chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_FFT_STOP' });
+}
+
+async function syncPlaying() {
+  if (isFirefox()) return;
+  const m = await getChromeOffscreen();
+  const status = (await m.getOffscreenStatus()) ?? {
+    playing: false,
+    reconnecting: false,
+    streamError: state.streamError || state.reconnecting,
+  };
+  if (status.playing !== state.playing || status.reconnecting !== state.reconnecting || status.streamError !== state.streamError) {
+    setState(status);
+  }
+}
+
 // --- WebSocket ---
 
-function handleNowPlayingUpdate({ song, history }: { song: Song | null; history: ExtensionState['history'] }) {
+function handleNowPlayingUpdate({ song, nextSong, history }: NowPlayingUpdate) {
   const prev = state.song;
   const changed = song && (song.title !== prev?.title || song.artist !== prev?.artist);
-  setState({ song, history });
-  if (!changed || !song || !state.playing) return;
+  setState({ song, nextSong, history });
+  if (!prev || !changed || !state.playing) return;
   loadNotifications().then((enabled) => {
-    if (!enabled) return;
-    const title = song.artist ? `${song.artist} - ${song.title}` : (song.title ?? '');
-    browser.notifications.create({
-      type: 'basic',
-      iconUrl: song.art ?? '',
-      title: 'jawr.org',
-      message: title,
-    });
+    if (enabled) showNowPlayingNotification();
   });
 }
 
 // --- Entry ---
 
-const VOLUME_STEP = 0.1;
+const VOLUME_STEP = 0.05;
+const VOLUME_SAVE_DELAY_MS = 500;
+let volumeSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let volumeLoaded: Promise<void> = Promise.resolve();
 
-function showNowPlayingNotification() {
-  const song = state.song;
-  if (!song) return;
-  const title = song.artist ? `${song.artist} - ${song.title}` : (song.title ?? '');
-  browser.notifications.create({
-    type: 'basic',
-    iconUrl: song.art ?? '',
-    title: 'jawr.org',
-    message: title,
+function changeVolume(update: (current: VolumeState) => VolumeState) {
+  volumeLoaded.then(() => {
+    const volume = update(state.volume);
+    const next = { value: clampVolume(volume.value), isMuted: volume.isMuted };
+    applyVolume(next);
+    setState({ volume: next });
+    if (volumeSaveTimer) clearTimeout(volumeSaveTimer);
+    volumeSaveTimer = setTimeout(() => saveVolume(next), VOLUME_SAVE_DELAY_MS);
   });
 }
 
+async function showNowPlayingNotification() {
+  const song = state.song;
+  if (!song) return;
+  const open = await browser.notifications.getAll();
+  await Promise.all(Object.keys(open).map((id) => browser.notifications.clear(id)));
+  const options = {
+    type: 'basic' as const,
+    iconUrl: song.art || browser.runtime.getURL('/icons/128.png'),
+    title: 'jawr',
+    message: formatSongTitle(song),
+    ...(isFirefox() ? {} : { silent: true }),
+  };
+  await browser.notifications.create(options);
+}
+
 export default defineBackground(() => {
-  loadVolume().then((volume) => {
+  volumeLoaded = loadVolume().then((volume) => {
     state = { ...state, volume };
     applyVolume(volume);
   });
 
+  syncPlaying();
+
   createWebSocketManager(WS_URL, handleNowPlayingUpdate);
 
-  fetchNowPlaying().then(({ song, history }) => {
-    setState({ song, history });
+  fetchNowPlaying()
+    .then((nowPlaying) => {
+      if (!state.song) setState(nowPlaying);
+    })
+    .catch(() => {});
+
+  browser.notifications.onClicked.addListener((id) => {
+    browser.tabs.create({ url: 'https://jawr.org' });
+    browser.notifications.clear(id);
+  });
+
+  browser.runtime.onConnect.addListener((port) => {
+    if (port.name === 'popup') port.onDisconnect.addListener(stopFft);
   });
 
   browser.commands.onCommand.addListener((command) => {
     switch (command) {
       case 'toggle-radio':
-        if (state.playing) pause();
-        else play();
+        syncPlaying().then(() => (state.playing ? pause() : play()));
         break;
       case 'display-now-playing':
         showNowPlayingNotification();
         break;
-      case 'lower-volume': {
-        const value = Math.max(0, Math.round((state.volume.value - VOLUME_STEP) * 100) / 100);
-        const volume = { ...state.volume, value };
-        saveVolume(volume);
-        applyVolume(volume);
-        setState({ volume });
+      case 'lower-volume':
+        changeVolume((v) => ({ ...v, value: v.value - VOLUME_STEP }));
         break;
-      }
-      case 'raise-volume': {
-        const value = Math.min(1, Math.round((state.volume.value + VOLUME_STEP) * 100) / 100);
-        const volume = { ...state.volume, value };
-        saveVolume(volume);
-        applyVolume(volume);
-        setState({ volume });
+      case 'raise-volume':
+        changeVolume((v) => ({ ...v, value: v.value + VOLUME_STEP }));
         break;
-      }
+      case 'toggle-mute':
+        changeVolume((v) => ({ ...v, isMuted: !v.isMuted }));
+        break;
     }
   });
 
-  browser.runtime.onMessage.addListener((rawMessage, _sender, sendResponse) => {
+  browser.runtime.onMessage.addListener((rawMessage: unknown) => {
     const message = rawMessage as ExtensionMessage;
-    if (message.target !== 'background') return false;
+    if (message.target !== 'background') return;
     switch (message.type) {
       case 'GET_STATE':
-        sendResponse(state);
-        return true;
+        return syncPlaying().then(() => state);
       case 'PLAY':
         play();
-        return false;
+        return;
       case 'PAUSE':
         pause();
-        return false;
-      case 'TOGGLE_MUTE': {
-        const volume = { ...state.volume, isMuted: !state.volume.isMuted };
-        saveVolume(volume);
-        applyVolume(volume);
-        setState({ volume });
-        return false;
-      }
-      case 'SET_VOLUME': {
-        const volume = { ...state.volume, value: message.payload };
-        saveVolume(volume);
-        applyVolume(volume);
-        setState({ volume });
-        return false;
-      }
-      case 'OFFSCREEN_ERROR':
-        setState({ playing: false });
-        return false;
+        return;
+      case 'TOGGLE_MUTE':
+        changeVolume((v) => ({ ...v, isMuted: !v.isMuted }));
+        return;
+      case 'SET_VOLUME':
+        changeVolume((v) => ({ ...v, value: message.payload }));
+        return;
+      case 'OFFSCREEN_STATUS':
+        setState(message.payload);
+        return;
       case 'OFFSCREEN_MEDIA_PLAY':
-        play();
-        return false;
+        syncPlaying().then(() => {
+          if (!state.playing) play();
+        });
+        return;
       case 'OFFSCREEN_MEDIA_PAUSE':
-        pause();
-        return false;
+        syncPlaying().then(() => {
+          if (state.playing) pause();
+        });
+        return;
       case 'FFT_START':
         if (isFirefox()) firefoxStartFft(message.payload);
         else chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_FFT_START', payload: message.payload });
-        return false;
+        return;
       case 'FFT_STOP':
-        if (isFirefox()) firefoxStopFft();
-        else chromeSendToOffscreen({ target: 'offscreen', type: 'OFFSCREEN_FFT_STOP' });
-        return false;
+        stopFft();
+        return;
     }
-    return false;
   });
 });
